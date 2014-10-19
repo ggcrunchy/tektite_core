@@ -28,7 +28,7 @@ local error = error
 local pcall = pcall
 
 -- Modules --
-local errors = require("tektite.errors")
+local errors = require("tektite_core.errors")
 
 -- Imports --
 local StoreTraceback = errors.StoreTraceback

@@ -28,8 +28,8 @@ local assert = assert
 local setmetatable = setmetatable
 
 -- Modules --
-local bound_args = require("var_ops.bound_args")
-local var_preds = require("var_ops.predicates")
+local bound_args = require("tektite_core.var.bound_args")
+local var_preds = require("tektite_core.var.predicates")
 
 -- Imports --
 local IsCallable = var_preds.IsCallable

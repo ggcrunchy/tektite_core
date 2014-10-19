@@ -36,8 +36,8 @@ local tostring = tostring
 local type = type
 
 -- Modules --
-local lazy = require("table_ops.lazy")
-local var_preds = require("var_ops.predicates")
+local lazy = require("tektite_core.table.lazy")
+local var_preds = require("tektite_core.var.predicates")
 
 -- Imports --
 local HasMeta = var_preds.HasMeta

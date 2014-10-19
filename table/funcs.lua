@@ -35,12 +35,10 @@ local setmetatable = setmetatable
 local type = type
 
 -- Modules --
-local bound_args = require("var_ops.bound_args")
-local func_ops = require("tektite.func_ops")
-local wipe = require("array_ops.wipe")
+local bound_args = require("tektite_core.var.bound_args")
+local wipe = require("tektite_core.array.wipe")
 
 -- Imports --
-local Identity = func_ops.Identity
 local WipeRange = wipe.WipeRange
 local WithBoundTable = bound_args.WithBoundTable
 
@@ -64,6 +62,11 @@ local function FixSelfKey (t, dt)
 	end
 end
 
+-- Helper to pass value through unaltered
+local function PassThrough (var)
+	return var
+end
+
 --- Shallow-copies a table.
 --
 -- @todo Account for cycles, table as key; link to Map
@@ -72,7 +75,7 @@ end
 -- @param how_arg Copy behavior, as per `Map`.
 -- @treturn table Copy.
 function M.Copy (t, how, how_arg)
-    return _Map_(t, Identity, how, nil, how_arg)
+    return _Map_(t, PassThrough, how, nil, how_arg)
 end
 
 --- Copies all values with the given keys into a second table with those keys.

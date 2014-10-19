@@ -32,8 +32,8 @@ local setmetatable = setmetatable
 local type = type
 
 -- Modules --
-local var_preds = require("var_ops.predicates")
-local wipe = require("array_ops.wipe")
+local var_preds = require("tektite_core.var.predicates")
+local wipe = require("tektite_core.array.wipe")
 
 -- Imports --
 local IsCallable = var_preds.IsCallable

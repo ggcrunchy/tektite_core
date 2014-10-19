@@ -29,9 +29,9 @@ local pairs = pairs
 local sort = table.sort
 
 -- Modules --
-local bound_args = require("var_ops.bound_args")
-local collect = require("array_ops.collect")
-local wipe = require("array_ops.wipe")
+local bound_args = require("tektite_core.var.bound_args")
+local collect = require("tektite_core.array.collect")
+local wipe = require("tektite_core.array.wipe")
 
 -- Imports --
 local CollectArgsInto = collect.CollectArgsInto
