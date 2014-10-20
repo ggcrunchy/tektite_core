@@ -151,8 +151,8 @@ do
 	-- When called in a bound table context, the binding is used as the destination table.
 	-- @string[opt] choice If **nil**, subtables will be normal tables.
 	--
-	-- Otherwise, the weak option, as per @{table_ops.funcs.Weak}, to assign a new subtable.
-	-- @string[opt] weakness The weak option, as per @{table_ops.funcs.Weak}, to apply to the
+	-- Otherwise, the weak option, as per @{tektite_core.table.funcs.Weak}, to assign a new subtable.
+	-- @string[opt] weakness The weak option, as per @{tektite_core.table.funcs.Weak}, to apply to the
 	-- table itself.
 	--
 	-- If **nil**, it will be a normal table.
@@ -160,7 +160,7 @@ do
 	--
 	-- If **nil**, fresh tables will always be supplied.
 	-- @treturn table Table.
-	-- @see var_ops.bound_args.WithBoundTable
+	-- @see tektite_core.var.bound_args.WithBoundTable
 	function M.SubTablesOnDemand (choice, weakness, cache)
 		local dt = GetTable()
 		local mt = Weakness[choice]

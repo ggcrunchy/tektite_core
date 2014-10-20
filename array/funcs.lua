@@ -51,7 +51,7 @@ local GetTable
 -- When called in a bound table context, the binding is used as the destination array.
 -- @uint count
 -- @treturn array Array.
--- @see var_ops.bound_args.WithBoundTable
+-- @see tektite_core.var.bound_args.WithBoundTable
 function M.ArrayOfTables (count)
 	local dt = GetTable()
 
@@ -136,7 +136,7 @@ end
 -- When called in a bound table context, the binding is used as the destination array.
 -- @array arr Array from which to read keys.
 -- @treturn table Key array.
--- @see var_ops.bound_args.WithBoundTable
+-- @see tektite_core.var.bound_args.WithBoundTable
 function M.GetKeys (arr)
     local dt = GetTable()
 

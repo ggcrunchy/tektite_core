@@ -265,7 +265,7 @@ end
 -- @uint[opt=#array] count Size of array.
 -- @param wipe Value used to wipe cleared entries.
 -- @return Array values (number of return values = _count_).
--- @see array_ops.wipe.UnpackAndWipe
+-- @see tektite_core.array.wipe.UnpackAndWipe
 function M.UnpackWipeAndRecache (cache, array, count, wipe)
 	cache[#cache + 1] = array
 
@@ -278,7 +278,7 @@ end
 -- @uint[opt=#array] count Size of array.
 -- @param wipe Value used to wipe cleared entries.
 -- @return _array_.
--- @see array_ops.wipe.WipeRange
+-- @see tektite_core.array.wipe.WipeRange
 function M.WipeAndRecache (cache, array, count, wipe)
 	cache[#cache + 1] = array
 
@@ -293,7 +293,7 @@ local TableOptions = { unpack_and_wipe = M.UnpackWipeAndRecache, wipe_range = M.
 -- its first argument, followed by any other arguments passed to the cache function. If
 -- **nil**, this is a no-op.
 --
--- If this is **"unpack\_and\_wipe"** or **"wipe_range"**, then that operation from @{array_ops.wipe}
+-- If this is **"unpack\_and\_wipe"** or **"wipe_range"**, then that operation from @{tektite_core.array.wipe}
 -- is used as the restore logic. In this case, the operation's results are returned by the
 -- cache function.
 -- @treturn function Cache function.
@@ -307,7 +307,7 @@ local TableOptions = { unpack_and_wipe = M.UnpackWipeAndRecache, wipe_range = M.
 -- Otherwise, the first argument must be a table (though it need not have belonged to the
 -- cache). Any restore logic will be called, passing this table and any additional arguments.
 -- The table will then be restored to the cache.
--- @see array_ops.wipe.UnpackAndWipe, array_ops.wipe.WipeRange
+-- @see tektite_core.array.wipe.UnpackAndWipe, tektite_core.array.wipe.WipeRange
 function M.TableCache (on_restore)
 	local option = TableOptions[on_restore]
 
