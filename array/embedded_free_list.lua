@@ -1,11 +1,7 @@
---- DOCME
-
--- The idea tends to appear when I need to use an array to store things, but also don't want them
--- moving around if items are removed. The vacated slots could be stuffed with false or whatever,
--- but I might as well put them to use, so those slots instead maintain the linked list of free
--- positions, for quick reallocation and so on.
-
--- Might as well pull in some of the other stuff too... doesn't look like it's doing any good not to?
+--- This module is motivated by the fact that, if elements are required to be non-numbers,
+-- elements may be removed without disturbing the positions of other elements elsewhere in
+-- the array, by populating their slots with integers. Furthermore, these very integers can
+-- be used to maintain a free list, allowing for O(1) retrieval of available array slots.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -30,23 +26,49 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
+-- Standard library imports --
+local type = type
+
 -- Exports --
 local M = {}
 
---[[
-REMOVE:
+--- DOCME
+-- @array arr
+-- @uint[opt] free
+-- @treturn uint X
+-- @treturn uint F
+function M.GetInsertIndex (arr, free)
+	if free and free > 0 then
+		return free, arr[free]
+	else
+		return #arr + 1, free or 0
+	end
+end
 
+--- DOCME
+-- @array arr
+-- @int index
+-- @treturn boolean B
+function M.InUse (arr, index)
+	-- Disregard non-array indices and invalid slots. To streamline the test, treat these
+	-- cases as though a number was found in the array part.
+	local elem = index > 0 and arr[index] or 0
+
+	-- The stack is comprised of numbers; conversely, non-numbers are in use.
+	return type(elem) ~= "number"
+end
+
+--- DOCME
+-- @array arr
+-- @int index
+-- @uint free
+-- @treturn uint X
+function M.RemoveAt (arr, index, free)
 	local n = #arr
 
-	-- Remove numbers from the hash part, then correct the index for removal of the
-	-- nonce that remains in the array part.
-	if i < 0 then
-		i, arr[i] = -i
-	end
-
 	-- Final slot: trim the array.
-	if i == n then
-		n, arr[i] = n - 1
+	if index == n then
+		n, arr[index] = n - 1
 
 		-- It may be possible to trim more: if the new final slot also happens to be
 		-- the free stack top, it is known to not be in use. Trim the array until this
@@ -56,40 +78,13 @@ REMOVE:
 		end
 
 	-- Otherwise, the removed slot becomes the free stack top.
-	elseif i >= 1 and i < n then
-		arr[i], free = free, i
+	elseif index >= 1 and index < n then
+		arr[index], free = free, index
 	end
 
 	-- Adjust the free stack top.
-	SA[_free] = free
-]]
-
---[[
-IN USE:
-
-	-- Disregard non-array indices and invalid slots. To streamline the test, treat these
-	-- cases as though a number was found in the array part.
-	local elem = i > 0 and arr[i] or 0
-
-	-- The stack is comprised of numbers; conversely, non-numbers are in use.
-	return type(elem) ~= "number"
-]]
-
---[[
-ADD:
-
-	local arr, free, index = self[_array], self[_free]
-
-	if free > 0 then
-		index, self[_free] = free, arr[free]
-	else
-		index = #arr + 1
-	end
-
-	Add(arr, index, elem) --> arr[index] = elem (in sparse array this does "fix" first in case it's a number...)
-
-	return index
-]]
+	return free
+end
 
 -- Export the module.
 return M
