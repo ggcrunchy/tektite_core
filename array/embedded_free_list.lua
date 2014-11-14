@@ -1,7 +1,9 @@
---- This module is motivated by the fact that, if elements are required to be non-numbers,
--- elements may be removed without disturbing the positions of other elements elsewhere in
--- the array, by populating their slots with integers. Furthermore, these very integers can
--- be used to maintain a free list, allowing for O(1) retrieval of available array slots.
+--- This module is motivated by the fact that, when an array's elements are required to be
+-- non-numbers, said elements may be removed without disturbing the positions of elements
+-- elsewhere in the array, by stuffing an integer into the vacated slot.
+--
+-- Furthermore, these same integers can be used to maintain a free list, thus providing O(1)
+-- retrieval of free array slots.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
