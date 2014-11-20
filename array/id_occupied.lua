@@ -92,5 +92,53 @@ local M = {}
 	until #Maze == 0
 ]]
 
+--[[
+	-- If this is a later probe (i.e. it doesn't begin at the start), it will have one or
+	-- more predecessors pointing at it from various directions. Turn this around: put our
+	-- probe into the successor list in each such predecessor (and reinterpret it as a
+	-- regular node).
+	if tile ~= start then
+		for _, prev in ipairs(visited[-tile]) do
+			prev.next = prev.next or { is_branch = true }
+
+			insert(prev.next, probe)
+
+			-- Back-propagate the patch.
+			PatchUp(prev, visited, paths, start)
+		end
+]]
+
+-- ...
+
+--[[
+				-- More than one route open:
+				-- Any probes leaving a tile in a given direction share the same future(s).
+				-- Thus, we only ever need one outgoing probe per direction in any given
+				-- tile, even if said tile was approached from more than one direction. A
+				-- consequence of this is that only probes that arrive at the tile early
+				-- (i.e. when not visited, or during the same iteration) are considered;
+				-- otherwise, their paths will already be too long (like goals, as above),
+				-- i.e. they constitute loops or backtracking. If accepted, the probe is
+				-- added to the tile's predecessor list.
+				local jinfo = visited[-tile]
+
+				if N > 1 and (not jinfo or jinfo.iteration == iteration) then
+					jinfo = jinfo or { iteration = iteration }
+
+					for j = 1, N do
+						local dir = Dirs[j].dir
+
+						if not jinfo[dir] then
+							insert(probes, { dt = Dirs[j].dt, tile, dir })
+
+							jinfo[dir] = true
+						end
+					end
+
+					insert(jinfo, cur)
+
+					visited[-tile] = jinfo
+]]
+
 -- Export the module.
 return M
