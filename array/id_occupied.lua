@@ -29,8 +29,89 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
+-- Modules --
+local index_funcs = require("tektite_core.array.index")
+
+-- Imports --
+local RotateIndex = index_funcs.RotateIndex
+
 -- Exports --
 local M = {}
+
+--- DOCME
+-- @array arr
+-- @uint index
+-- @param[opt="id"] id
+-- @treturn boolean B
+function M.CheckSlot_ID (arr, index, id)
+	return arr[-index] == arr[id or "id"]
+end
+
+--- DOCME
+-- @array arr
+-- @uint index
+-- @treturn boolean B
+function M.CheckSlot_Zero (arr, index)
+	return arr[-index] == arr[0]
+end
+
+--- DOCME
+-- @array arr
+-- @uint[opt] n
+-- @treturn function X
+-- @treturn function Y
+-- @treturn function Z
+function M.MakeFuncs (arr, n)
+	local nonce = 0
+
+	return function()
+		nonce = RotateIndex(nonce, n or #arr)
+
+		arr[-nonce] = nonce
+	end,
+	function(index)
+		return arr[-index] == nonce
+	end,
+	function(index)
+		arr[-index] = nonce
+	end
+end
+
+--- DOCME
+-- @array arr
+-- @uint index
+-- @param[opt="id"] id
+function M.MarkSlot_ID (arr, index, id)
+	arr[-index] = arr[id or "id"]
+end
+
+--- DOCME
+-- @array arr
+-- @uint index
+function M.MarkSlot_Zero (arr, index)
+	arr[-index] = arr[0]
+end
+
+--
+local function AuxUpdate (arr, key, n)
+	local new = RotateIndex(arr[key] or 0, n or #arr)
+
+	arr[key], arr[-new] = new
+end
+
+--- DOCME
+-- @array arr
+-- @ptable[opts] opts
+function M.Update_ID (arr, opts)
+	AuxUpdate(arr, (opts and opts.id) or "id", opts and opts.n)
+end
+
+--- DOCME
+-- @array arr
+-- @uint[opt=#arr] n
+function M.Update_Zero (arr, n)
+	AuxUpdate(arr, 0, n)
+end
 
 --[[
 	-- Update the ID for the current maze and overwrite one slot with an invalid ID. A slot
@@ -90,54 +171,6 @@ local M = {}
 			remove(Maze)
 		end
 	until #Maze == 0
-]]
-
---[[
-	-- If this is a later probe (i.e. it doesn't begin at the start), it will have one or
-	-- more predecessors pointing at it from various directions. Turn this around: put our
-	-- probe into the successor list in each such predecessor (and reinterpret it as a
-	-- regular node).
-	if tile ~= start then
-		for _, prev in ipairs(visited[-tile]) do
-			prev.next = prev.next or { is_branch = true }
-
-			insert(prev.next, probe)
-
-			-- Back-propagate the patch.
-			PatchUp(prev, visited, paths, start)
-		end
-]]
-
--- ...
-
---[[
-				-- More than one route open:
-				-- Any probes leaving a tile in a given direction share the same future(s).
-				-- Thus, we only ever need one outgoing probe per direction in any given
-				-- tile, even if said tile was approached from more than one direction. A
-				-- consequence of this is that only probes that arrive at the tile early
-				-- (i.e. when not visited, or during the same iteration) are considered;
-				-- otherwise, their paths will already be too long (like goals, as above),
-				-- i.e. they constitute loops or backtracking. If accepted, the probe is
-				-- added to the tile's predecessor list.
-				local jinfo = visited[-tile]
-
-				if N > 1 and (not jinfo or jinfo.iteration == iteration) then
-					jinfo = jinfo or { iteration = iteration }
-
-					for j = 1, N do
-						local dir = Dirs[j].dir
-
-						if not jinfo[dir] then
-							insert(probes, { dt = Dirs[j].dt, tile, dir })
-
-							jinfo[dir] = true
-						end
-					end
-
-					insert(jinfo, cur)
-
-					visited[-tile] = jinfo
 ]]
 
 -- Export the module.
