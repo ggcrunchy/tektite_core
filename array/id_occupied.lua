@@ -1,10 +1,19 @@
---- DOCME
-
--- The idea here is that you can just mark in-use array slots (stored in the negative keys)
--- with an ID, which is updated after every "frame". As opposed to using booleans, you don't
--- need to wipe the whole array, only update the ID. (Although probably not a concern with
--- doubles, you can even ensure you don't have false positives by gradually overwriting
--- one or more entries after each frame.)
+--- This module is motivated by the situation where an array requires some auxiliary state
+-- indicating which of its elements are in use.
+--
+-- In the common case that an array's negative indices are unused, those slots may be used
+-- for this purpose. In such cases, one obvious corollary is that only a single table need
+-- be passed around, not two.
+--
+-- Furthermore, if users are indifferent to the underlying representation of all this state,
+-- an alternative to explicit booleans is storing some sort of identifier. Then, instead of
+-- checking for an explicit **true**, the in-use predicate passes if this identifier is equal
+-- to some known value.
+--
+-- If this method is used, marking all elements as not in use is an O(1) operation, since it
+-- is equivalent to changing the identifier. This facilitates certain generational patterns,
+-- e.g. per-frame data construction. (Some care is also taken to account for overflow, though
+-- this is rather improbable if Lua's number type is the standard double.)
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -38,6 +47,33 @@ local RotateIndex = index_funcs.RotateIndex
 -- Exports --
 local M = {}
 
+--
+local function AuxBeginGeneration (arr, key, n)
+	-- Update the ID for the current generation and overwrite one slot with an invalid ID,
+	-- i.e. nil. This is an alternative to clearing all slots one by one: since the ID is
+	-- new, no slot matches it, i.e. none remain in use. Overwriting one slot per generation
+	-- avoids false positives: since the ID's are just the indices of the array (mod n), all
+	-- n slots will have been wiped when the generation comes around again, and could only
+	-- have been overwritten with a different ID.
+	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
+
+	arr[key], arr[-gen_id] = gen_id
+end
+
+--- DOCME
+-- @array arr
+-- @ptable[opts] opts
+function M.BeginGeneration_ID (arr, opts)
+	AuxBeginGeneration(arr, (opts and opts.id) or "id", opts and opts.n)
+end
+
+--- DOCME
+-- @array arr
+-- @uint[opt=#arr] n
+function M.BeginGeneration_Zero (arr, n)
+	AuxBeginGeneration(arr, 0, n)
+end
+
 --- DOCME
 -- @array arr
 -- @uint index
@@ -57,28 +93,6 @@ end
 
 --- DOCME
 -- @array arr
--- @uint[opt] n
--- @treturn function X
--- @treturn function Y
--- @treturn function Z
-function M.MakeFuncs (arr, n)
-	local nonce = 0
-
-	return function()
-		nonce = RotateIndex(nonce, n or #arr)
-
-		arr[-nonce] = nonce
-	end,
-	function(index)
-		return arr[-index] == nonce
-	end,
-	function(index)
-		arr[-index] = nonce
-	end
-end
-
---- DOCME
--- @array arr
 -- @uint index
 -- @param[opt="id"] id
 function M.MarkSlot_ID (arr, index, id)
@@ -92,86 +106,37 @@ function M.MarkSlot_Zero (arr, index)
 	arr[-index] = arr[0]
 end
 
---
-local function AuxUpdate (arr, key, n)
-	local new = RotateIndex(arr[key] or 0, n or #arr)
-
-	arr[key], arr[-new] = new
-end
-
 --- DOCME
 -- @array arr
--- @ptable[opts] opts
-function M.Update_ID (arr, opts)
-	AuxUpdate(arr, (opts and opts.id) or "id", opts and opts.n)
-end
+-- @uint[opt] n
+-- @treturn function X
+-- @treturn array _arr_.
+function M.Wrap (arr, n)
+	local gen_id = 0
 
---- DOCME
--- @array arr
--- @uint[opt=#arr] n
-function M.Update_Zero (arr, n)
-	AuxUpdate(arr, 0, n)
-end
+	return function(what, index)
+		-- Check --
+		-- index: Index in array to check
+		if what == "check" then
+			return arr[-index] == nonce
 
---[[
-	-- Update the ID for the current maze and overwrite one slot with an invalid ID. A slot
-	-- is considered "explored" if it contains the current ID. This is a subtle alternative
-	-- to overwriting all slots or building a new table: Since the current ID iterates over
-	-- the number of available slots (and then resets), and since every slot is invalidated
-	-- between occurrences of the ID taking on a given value, all slots will either contain
-	-- some other ID or be invalid, i.e. none will be already explored.
-	local new = array_index.RotateIndex(open.id, #open)
+		-- Mark --
+		-- index: Index in array to mark
+		elseif what == "mark" then
+			arr[-index] = gen_id
 
-	open.id, open[-new] = new
+		-- Begin Generation --
+		elseif what == "begin_generation" then
+			gen_id = RotateIndex(gen_id, n or #arr) -- see the comment in AuxBeginGeneration()
 
-	-- Compute the deltas between rows of the maze event block (using its width).
-	local col1, col2 = block:GetColumns()
+			arr[-gen_id] = nil
 
-	Deltas[1] = col1 - col2 - 1
-	Deltas[3] = col2 - col1 + 1
-
-	-- Choose a random maze tile and do a random flood-fill of the block.
-	Maze[#Maze + 1] = random(#open / 4)
-
-	repeat
-		local index = Maze[#Maze]
-
-		-- Mark this tile slot as explored.
-		open[-index] = new
-
-		-- Examine each direction out of the tile. If the direction was already marked
-		-- (borders are pre-marked in the relevant direction), or the relevant neighbor
-		-- has already been explored, ignore it. Otherwise, add it to the choices.
-		local oi, n = (index - 1) * 4, 0
-
-		for i, delta in ipairs(Deltas) do
-			if not (open[oi + i] or open[-(index + delta)] == new) then
-				n = n + 1
-
-				Choices[n] = i
-			end
+		-- Get Array --
+		elseif what == "get_array" then
+			return arr
 		end
-
-		-- If there are no choices left, remove the tile from the list. Otherwise, choose
-		-- one of the available directions and mark it, plus the reverse direction in the
-		-- relevant neighbor, and try to resume the flood-fill from that neighbor.
-		if n > 0 then
-			local i = Choices[random(n)]
-			local delta = Deltas[i]
-
-			open[oi + i] = true
-
-			oi = oi + delta * 4
-			i = (i + 1) % 4 + 1
-
-			open[oi + i] = true
-
-			Maze[#Maze + 1] = index + delta
-		else
-			remove(Maze)
-		end
-	until #Maze == 0
-]]
+	end, arr
+end
 
 -- Export the module.
 return M
