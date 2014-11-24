@@ -1,19 +1,17 @@
 --- This module is motivated by the situation where an array requires some auxiliary state
 -- indicating which of its elements are in use.
 --
--- In the common case that an array's negative indices are unused, those slots may be used
--- for this purpose. In such cases, one obvious corollary is that only a single table need
--- be passed around, not two.
+-- In the common case that an array's negative indices are otherwise unused, those slots may
+-- be commandeered for this purpose. An obvious corollary, then, is that only a single table
+-- need be passed around in such cases, not two.
 --
--- Furthermore, if users are indifferent to the underlying representation of all this state,
--- an alternative to explicit booleans is storing some sort of identifier. Then, instead of
--- checking for an explicit **true**, the in-use predicate passes if this identifier is equal
--- to some known value.
+-- Furthermore, if users are indifferent to the underlying representation of such state, one
+-- option is to store some identifier. Then, instead of checking explicitly for **true**, a
+-- slot is "in use" if the value in its slot matches some expected value.
 --
--- If this method is used, marking all elements as not in use is an O(1) operation, since it
--- is equivalent to changing the identifier. This facilitates certain generational patterns,
--- e.g. per-frame data construction. (Some care is also taken to account for overflow, though
--- this is rather improbable if Lua's number type is the standard double.)
+-- When this method is used, marking all elements as not in use becomes an O(1) operation,
+-- since doing so involves nothing more than changing the aforementioned expected value.
+-- This facilitates certain generational patterns, e.g. per-frame logic.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -49,12 +47,18 @@ local M = {}
 
 --
 local function AuxBeginGeneration (arr, key, n)
-	-- Update the ID for the current generation and overwrite one slot with an invalid ID,
-	-- i.e. nil. This is an alternative to clearing all slots one by one: since the ID is
-	-- new, no slot matches it, i.e. none remain in use. Overwriting one slot per generation
-	-- avoids false positives: since the ID's are just the indices of the array (mod n), all
-	-- n slots will have been wiped when the generation comes around again, and could only
-	-- have been overwritten with a different ID.
+	-- Update the master ID for the current generation and overwrite one slot with an invalid
+	-- ID (nil). This is an alternative to clearing all slots one by one: since the ID value is
+	-- new, no slot has a match, i.e. none remain in use.
+
+	-- The overwrite step prevents false positives: the master ID is just a counter (mod n),
+	-- where n is the array length; over the n subsequent generations, each slot in the array
+	-- gets invalidated; thus, since a given value for the ID is only added during its own
+	-- generation, said value will be absent when the master ID takes on that value again.
+
+	-- Of course, if numbers are still doubles (in 5.3+, if integers are still 64-bit), say if
+	-- this is stock Lua or LuaJIT, the rotate and overwrites are mostly a formality, given how
+	-- long it takes to increment a number to overflow.
 	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
 
 	arr[key], arr[-gen_id] = gen_id
