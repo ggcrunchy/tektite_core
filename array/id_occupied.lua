@@ -1,17 +1,14 @@
 --- This module is motivated by the situation where an array requires some additional state
--- to indicate which of its elements are in use.
+-- to indicate which of its elements are in use. In the most common case, where an array's
+-- negative indices would otherwise go unused, these may be commandeered for this purpose.
 --
--- In the common case that an array's negative indices otherwise go unused, these slots may
--- be commandeered for this purpose. An obvious corollary, then, is that such cases require
--- that only a single table be passed around, rather than two.
+-- Obviously, this eliminates the need to track two tables. Furthermore, if the underlying
+-- representation makes no difference to the user, an integer may be stored instead of an
+-- explicit boolean. A slot is said to be "in use" if this integer matches some master ID.
 --
--- Furthermore, if users are indifferent to the underlying representation of such state, one
--- option is to store some integer. Then, instead of checking, say, against **true**, a slot
--- is found to be "in use" if this integer value matches some "truth" value.
---
--- When this technique is used, marking all elements as not in use is an O(1) operation; to
--- do so, one need only change the aforementioned "truth" value. This facilitates certain
--- generational patterns, e.g. actions that occur once per frame.
+-- When this technique is used, marking all elements as **not** in use is an O(1) operation;
+-- to do so, one simply changes the master ID. This facilitates certain patterns that occur
+-- periodically, e.g. per-frame and per-timeout actions.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -45,20 +42,22 @@ local RotateIndex = index_funcs.RotateIndex
 -- Exports --
 local M = {}
 
---
+-- Helper to kick off a new generation
 local function AuxBeginGeneration (arr, key, n)
 	-- Update the master ID for the current generation and overwrite one slot with an invalid
-	-- ID (nil). This is an alternative to clearing all slots one by one: since the ID value
-	-- is new, no slot has a match, i.e. none remain in use.
+	-- ID (nil); for convenience, the index of this slot is the master ID's value. This is an
+	-- alternative to clearing all slots one by one: the master ID is new, and ipso facto no
+	-- slot has a match, therefore none remain in use.
 
-	-- The overwrite step prevents false positives: the master ID is just a counter (mod n),
-	-- where n is the array length; over the n subsequent generations, each slot in the array
-	-- gets invalidated; thus, since a given value for the ID is only added during its own
-	-- generation, said value will be absent when the master ID takes on that value again.
+	-- When a slot is marked, it gets assigned the current value of the master ID. The ID is
+	-- implemented as a counter (mod n), where n is the array length. After n generations, when
+	-- the counter rolls back around to the same value, the overwrite will have been applied to
+	-- exactly n slots. Thus, there will not be any false positives for "in use", on account of
+	-- dangling instances of the master ID in the array.
 
-	-- Of course, if this is stock Lua or LuaJIT, say, where numbers are still doubles (in
-	-- 5.3+, where integers are still 64-bit), the rotate and overwrites become mostly a
-	-- formality, given how long it would take to increment these to overflow.
+	-- That said, if this is stock Lua or LuaJIT, say, where numbers are still doubles (or in
+	-- 5.3+, where integers are still 64-bit), much of this is a formality, given how incredibly
+	-- long it would take to increment these to overflow.
 	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
 
 	arr[key], arr[-gen_id] = gen_id
@@ -122,7 +121,7 @@ function M.Wrap (arr, n)
 		-- Check --
 		-- index: Index in array to check
 		if what == "check" then
-			return arr[-index] == nonce
+			return arr[-index] == gen_id
 
 		-- Mark --
 		-- index: Index in array to mark
