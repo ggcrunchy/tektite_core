@@ -1,17 +1,17 @@
---- This module is motivated by the situation where an array requires some auxiliary state
--- indicating which of its elements are in use.
+--- This module is motivated by the situation where an array requires some additional state
+-- to indicate which of its elements are in use.
 --
--- In the common case that an array's negative indices are otherwise unused, those slots may
--- be commandeered for this purpose. An obvious corollary, then, is that only a single table
--- need be passed around in such cases, not two.
+-- In the common case that an array's negative indices otherwise go unused, these slots may
+-- be commandeered for this purpose. An obvious corollary, then, is that such cases require
+-- that only a single table be passed around, rather than two.
 --
 -- Furthermore, if users are indifferent to the underlying representation of such state, one
--- option is to store some identifier. Then, instead of checking explicitly for **true**, a
--- slot is "in use" if the value in its slot matches some expected value.
+-- option is to store some integer. Then, instead of checking, say, against **true**, a slot
+-- is found to be "in use" if this integer value matches some "truth" value.
 --
--- When this method is used, marking all elements as not in use becomes an O(1) operation,
--- since doing so involves nothing more than changing the aforementioned expected value.
--- This facilitates certain generational patterns, e.g. per-frame logic.
+-- When this technique is used, marking all elements as not in use is an O(1) operation; to
+-- do so, one need only change the aforementioned "truth" value. This facilitates certain
+-- generational patterns, e.g. actions that occur once per frame.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -48,17 +48,17 @@ local M = {}
 --
 local function AuxBeginGeneration (arr, key, n)
 	-- Update the master ID for the current generation and overwrite one slot with an invalid
-	-- ID (nil). This is an alternative to clearing all slots one by one: since the ID value is
-	-- new, no slot has a match, i.e. none remain in use.
+	-- ID (nil). This is an alternative to clearing all slots one by one: since the ID value
+	-- is new, no slot has a match, i.e. none remain in use.
 
 	-- The overwrite step prevents false positives: the master ID is just a counter (mod n),
 	-- where n is the array length; over the n subsequent generations, each slot in the array
 	-- gets invalidated; thus, since a given value for the ID is only added during its own
 	-- generation, said value will be absent when the master ID takes on that value again.
 
-	-- Of course, if numbers are still doubles (in 5.3+, if integers are still 64-bit), say if
-	-- this is stock Lua or LuaJIT, the rotate and overwrites are mostly a formality, given how
-	-- long it takes to increment a number to overflow.
+	-- Of course, if this is stock Lua or LuaJIT, say, where numbers are still doubles (in
+	-- 5.3+, where integers are still 64-bit), the rotate and overwrites become mostly a
+	-- formality, given how long it would take to increment these to overflow.
 	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
 
 	arr[key], arr[-gen_id] = gen_id
