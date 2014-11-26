@@ -32,18 +32,9 @@ local setmetatable = setmetatable
 -- Exports --
 local M = {}
 
---- Helper to require multiple modules at once.
--- @string name Name of a list module.
---
--- The result of @{require}'ing this module is assumed to be a list of key-name pairs. If
--- there is a **_prefix** key in the list, its value is prepended to each name, i.e.
--- `name = prefix.name`. Otherwise, keys may be arbitrary, e.g. the list can be an array.
---
--- Each name is passed to @{require} and the result added to a key-module pairs list.
--- @treturn table Key-module pairs; a module is found under the same key as was its name.
-function M.DoList (name)
-	local from = require(name)
-	local prefix, list = from._prefix, {}
+-- Helper logic for DoList
+local function AuxDoList (from, list)
+	local prefix = from._prefix
 
 	prefix = prefix and prefix .. "." or ""
 
@@ -52,11 +43,37 @@ function M.DoList (name)
 			list[k] = require(prefix .. v)
 		end
 	end
+end
+
+--- Helper to require multiple modules at once.
+-- @string name Name of a list module.
+--
+-- The result of @{require}'ing this module is assumed to be a table. If it contains an
+-- **_is\_array** key, it is treated as an array, about which more below; otherwise, it is
+-- interpreted as a list of key-name pairs. If there is a **_prefix** key in the list, its
+-- value is prepended to each name, i.e. `name = prefix.name`. Otherwise, keys may be
+-- arbitrary, e.g. the list can be an array.
+--
+-- Each name is passed to @{require} and the result added to a key-module pairs list.
+--
+-- When treating the table as an array, each element is assumed to be a list of key-name
+-- pairs, as described above. Duplicate keys lead to undefined behavior.
+-- @treturn table Key-module pairs; a module is found under the same key as was its name.
+function M.DoList (name)
+	local from, list = require(name), {}
+
+	if from._is_array ~= nil then
+		for _, v in ipairs(from) do
+			AuxDoList(v, list)
+		end
+	else
+		AuxDoList(from, list)
+	end
 
 	return list
 end
 
---- Variant of @{DoList} that takes an list of names.
+--- Variant of @{DoList} that takes a list of names.
 -- @ptable names Key-name pairs, e.g. as collected by @{GetNames}. The names are passed to
 -- @{require}, and the results added to a name-module pairs list.
 -- @string[opt=""] prefix Prefix prepended to each name.
