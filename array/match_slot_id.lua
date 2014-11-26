@@ -1,14 +1,18 @@
---- This module is motivated by the situation where an array requires some additional state
--- to indicate which of its elements are in use. In the most common case, where an array's
--- negative indices would otherwise go unused, these may be commandeered for this purpose.
+--- This module is motivated by the situation where an array must be ready to answer some
+-- yes-or-no question about each of its elements. For example: is element X in use?
+--
+-- It will usually be difficult to maintain the necessary state in the elements themselves.
+-- It is quite common in the case of arrays, however, that the table's negative integer
+-- indices go unused. When this is so, these may be commandeered to store the state; this
+-- conveniently allows a boolean at index -_i_ to describe an element at index _i_.
 --
 -- Obviously, this eliminates the need to track two tables. Furthermore, if the underlying
 -- representation makes no difference to the user, an integer may be stored instead of an
--- explicit boolean. A slot is said to be "in use" if this integer matches some master ID.
+-- explicit boolean. The element then has a "yes" if this integer matches some master ID.
 --
--- When this technique is used, marking all elements as **not** in use is an O(1) operation;
--- to do so, one simply changes the master ID. This facilitates certain patterns that occur
--- periodically, e.g. per-frame and per-timeout actions.
+-- When this technique is used, setting all elements to "no" is an O(1) operation; one simply
+-- changes the master ID. This is useful in various periodic patterns, such as per-frame and
+-- per-timeout actions.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -47,16 +51,16 @@ local function AuxBeginGeneration (arr, key, n)
 	-- Update the master ID for the current generation and overwrite one slot with an invalid
 	-- ID (nil); for convenience, the index of this slot is the master ID's value. This is an
 	-- alternative to clearing all slots one by one: the master ID is new, and ipso facto no
-	-- slot has a match, therefore none remain in use.
+	-- slot has a match, therefore none remain "yes".
 
 	-- When a slot is marked, it gets assigned the current value of the master ID. The ID is
-	-- implemented as a counter (mod n), where n is the array length. After n generations, when
-	-- the counter rolls back around to the same value, the overwrite will have been applied to
-	-- exactly n slots. Thus, there will not be any false positives for "in use", on account of
-	-- dangling instances of the master ID in the array.
+	-- implemented as a counter (mod n), where n is the array length. After n generations,
+	-- when the counter rolls back around to the same value, the overwrite will have been
+	-- applied to exactly n slots. Thus, there will not be any false "yes" positives on
+	-- account of dangling instances of the master ID in the array.
 
 	-- That said, if this is stock Lua or LuaJIT, say, where numbers are still doubles (or in
-	-- 5.3+, where integers are still 64-bit), much of this is a formality, given how incredibly
+	-- 5.3+, where integers are still 64-bit), much of this is a formality, given how very
 	-- long it would take to increment these to overflow.
 	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
 
