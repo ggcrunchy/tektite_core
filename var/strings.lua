@@ -24,9 +24,12 @@
 --
 
 -- Standard library imports --
+local find = string.find
 local format = string.format
+local gsub = string.gsub
 local match = string.match
 local tonumber = tonumber
+local reverse = string.reverse
 local sub = string.sub
 
 -- Cached module references --
@@ -147,6 +150,27 @@ end
 -- @treturn string Key. The values may be read back out via @{KeyToPair}.
 function M.PairToKey (a, b)
 	return format("%ix%i", a, b)
+end
+
+-- Common substring remove logic
+local function AuxRemoveLastSubstring (str, patt, rep)
+	local pos = find(reverse(str), patt)
+
+	if pos then
+		str = sub(str, 1, -pos - 1)
+
+		return rep and gsub(str, patt, rep) or str
+	end
+end
+
+--- DOCME
+function M.RemoveLastSubstring (str, patt, rep)
+	return AuxRemoveLastSubstring(str, patt, rep) or ""
+end
+
+--- DOCME
+function M.RemoveLastSubstring_Keep (str, patt, rep)
+	return AuxRemoveLastSubstring(str, patt, rep) or str
 end
 
 -- Cache module members.
