@@ -28,29 +28,61 @@ local ipairs = ipairs
 local pairs = pairs
 local require = require
 local setmetatable = setmetatable
+local type = type
 
 -- Exports --
 local M = {}
 
--- Helper logic for DoList
-local function AuxDoList (from, list)
-	local prefix = from._prefix
+-- Helper logic for DoList and GetNames
+local function AuxDo (from, list, action, acc, n)
+	local prefix, res = from._prefix
 
 	prefix = prefix and prefix .. "." or ""
 
 	for k, v in pairs(from) do
 		if k ~= "_prefix" then
-			list[k] = require(prefix .. v)
+			res, acc = action(v, prefix, acc)
+
+			if n and type(k) == "number" and k % 1 == 0 then
+				list[n + k] = res
+			else
+				list[k] = res
+			end
 		end
 	end
+
+	return acc
+end
+
+--
+local function Do (name, action)
+	local from, list, acc = require(name), {}
+	local is_array = from._is_array
+
+	if is_array then
+		local splice = is_array == "splice_sequence"
+
+		for _, v in ipairs(from) do
+			acc = AuxDo(v, list, action, acc, splice and #list)
+		end
+	else
+		acc = AuxDo(from, list, action)
+	end
+
+	return list, acc
+end
+
+--
+local function Require (v, prefix)
+	return require(prefix .. v)
 end
 
 --- Helper to require multiple modules at once.
 -- @string name Name of a list module.
 --
--- The result of @{require}'ing this module is assumed to be a table. If it contains an
--- **_is\_array** key, it is treated as an array, about which more below; otherwise, it is
--- interpreted as a list of key-name pairs. If there is a **_prefix** key in the list, its
+-- The result of @{require}'ing this module is assumed to be a table. If it contains a
+-- true **_is\_array** key, it is treated as an array, about which more below; otherwise, it
+-- is interpreted as a list of key-name pairs. If there is a **_prefix** key in the list, its
 -- value is prepended to each name, i.e. `name = prefix.name`. Otherwise, keys may be
 -- arbitrary, e.g. the list can be an array.
 --
@@ -58,19 +90,14 @@ end
 --
 -- When treating the table as an array, each element is assumed to be a list of key-name
 -- pairs, as described above. Duplicate keys lead to undefined behavior.
+--
+-- If the value of **_is\_array** is **"splice_sequence"**, the array length, #_t_ (of the
+-- table to be returned), is cached at the beginning of each list; this amount is added to
+-- any integer key in the list, to give its index in the output. The gist of this is that,
+-- when the array parts are spliced together, the final result is also a proper sequence.
 -- @treturn table Key-module pairs; a module is found under the same key as was its name.
 function M.DoList (name)
-	local from, list = require(name), {}
-
-	if from._is_array ~= nil then
-		for _, v in ipairs(from) do
-			AuxDoList(v, list)
-		end
-	else
-		AuxDoList(from, list)
-	end
-
-	return list
+	return (Do(name, Require))
 end
 
 --- Variant of @{DoList} that takes a list of names.
@@ -81,15 +108,30 @@ end
 -- **N.B.** If not empty, this must include the trailing dot.
 -- @treturn table Name-module pairs.
 function M.DoList_Names (names, prefix)
-	prefix = prefix or ""
-
 	local list = {}
 
-	for _, name in pairs(names) do
-		list[name] = require(prefix .. name)
+	if type(prefix) == "table" then
+		for _, name in pairs(names) do
+			list[name] = require(prefix[name] .. name)
+		end
+	else
+		prefix = prefix or ""
+
+		for _, name in pairs(names) do
+			list[name] = require(prefix .. name)
+		end
 	end
 
 	return list
+end
+
+--
+local function GroupPrefixAndReturn (name, prefix, acc)
+	acc = acc or {}
+
+	acc[name] = prefix
+
+	return name, acc
 end
 
 --- This performs half of the work of @{DoList}, namely getting the module names, which
@@ -99,16 +141,7 @@ end
 -- @treturn string If a **_prefix** key was found in the list, its value (plus a trailing
 -- dot); otherwise, the empty string.
 function M.GetNames (name)
-	local from = require(name)
-	local prefix, list = from._prefix, {}
-
-	for k, v in pairs(from) do
-		if k ~= "_prefix" then
-			list[k] = v
-		end
-	end
-
-	return list, prefix and prefix .. "." or ""
+	return Do(name, GroupPrefixAndReturn)
 end
 
 --- Helper to deal with circular module require situations. Provided module access is not
