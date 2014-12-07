@@ -31,6 +31,7 @@ local match = string.match
 local tonumber = tonumber
 local reverse = string.reverse
 local sub = string.sub
+local upper = string.upper
 
 -- Cached module references --
 local _EndsWith_AnyCase_
@@ -171,6 +172,50 @@ end
 --- DOCME
 function M.RemoveLastSubstring_Keep (str, patt, rep)
 	return AuxRemoveLastSubstring(str, patt, rep) or str
+end
+
+-- --
+local SplitFuncs, Spacer = {}
+
+--
+local function LowerSpacerUpper (last, next)
+	return last .. Spacer .. next
+end
+
+--
+function SplitFuncs.case_switch (str)
+	return gsub(str, "(%l)(%u)", LowerSpacerUpper)
+end
+
+--
+local function SpacerToUpper (letter)
+	return Spacer .. upper(letter)
+end
+
+--
+function SplitFuncs.on_pattern (str, opts)
+	local patt = opts and opts.patt or "_"
+
+	str = gsub(str, patt .. "(%l)", SpacerToUpper)
+	str = gsub(str, patt, Spacer)
+	str = gsub(str, "^(%l)", upper)
+
+	return str
+end
+
+--- DOCME
+function M.SplitIntoWords (str, how, opts)
+	local func = SplitFuncs[how]
+
+	if func then
+		Spacer = opts and opts.spacer or " "
+
+		str = func(str, opts)
+
+		Spacer = nil
+	end
+
+	return str
 end
 
 -- Cache module members.
