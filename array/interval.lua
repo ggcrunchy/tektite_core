@@ -29,10 +29,8 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
--- Exports --
-local M = {}
-
 -- Standard library imports --
+local assert = assert
 local max = math.max
 local min = math.min
 
@@ -42,24 +40,35 @@ local index_funcs = require("tektite_core.array.index")
 -- Imports --
 local IndexInRange = index_funcs.IndexInRange
 
+-- Cached module references --
+local _IsIndexValid_
+
+-- Exports --
+local M = {}
+
 --- DOCME
 -- @uint index
--- @uint new_start
--- @uint new_count
+-- @uint start
+-- @uint count
 -- @uint new_size
 -- @bool add_spot
 -- @treturn uint INDEX
-function M.IndexAfterInsert (index, new_start, new_count, new_size, add_spot)
-	if IndexInRange(index, new_size, add_spot) then
+function M.IndexAfterInsert (index, start, count, new_size, add_spot)
+	local old_size = new_size - count
+
+	assert(start > 0 and start <= old_size + 1, "Interval extends beyond size")
+
+	if index >= start and _IsIndexValid_(index, old_size, add_spot) then
 		-- Move the spot ahead if it follows the insertion.
-		if index >= new_start then
-			index = index + new_count
-		end
+--		if index >= start then
+			index = index + count
+--[[		end
 
 		-- If the sequence was empty, the spot will follow it. Back up if this is illegal.
-		if new_size == new_count and not add_spot then
+		if old_size == 0 and not add_spot then
 			return index - 1
-		end
+		end]]
+		-- ^^ Can even be reached if empty? (in light of the more accurate IndexInRange(), that is...)
 	end
 
 	return index
@@ -67,28 +76,30 @@ end
 
 --- DOCME
 -- @uint index
--- @uint new_start
--- @uint new_count
+-- @uint start
+-- @uint count
 -- @uint new_size
 -- @bool add_spot
 -- @bool can_migrate
 -- @treturn uint INDEX
-function M.IndexAfterRemove (index, new_start, new_count, new_size, add_spot, can_migrate)
-	if IndexInRange(index, new_size, add_spot) then
+function M.IndexAfterRemove (index, start, count, new_size, add_spot, can_migrate)
+	assert(start > 0 and start <= new_size + 1, "Interval begins too far along")
+
+	if _IsIndexValid_(index, new_size + count, add_spot) then
 		-- If a spot follows the range, back up by the remove count.
-		if index >= new_start + new_count then
-			return index - new_count
+		if index >= start + count then
+			return index - count
 
 		-- Otherwise, handle removes within the range.
-		elseif index >= new_start then
+		elseif index >= start then
 			if can_migrate then
 				-- Migrate past the range.
-				index = new_start
+				index = start
 
 				-- If the range was at the end of the items, the spot will now be past the
 				-- end. Back it up if this is illegal.
-				if new_start == new_size + 1 and not add_spot then
-					return max(new_start - 1, 1)
+				if start == new_size + 1 and not add_spot then
+					return max(start - 1, 1)
 				end
 
 			-- Clear non-migratory spots.
@@ -149,6 +160,14 @@ function M.IntervalAfterRemove (old_start, old_count, new_start, new_count)
 
 	return old_start, old_count
 end
+
+--- DOCME
+function M.IsIndexValid (index, size, add_spot)
+	return index > 0 and IndexInRange(index, size, add_spot)
+end
+
+-- Cache module members.
+_IsIndexValid_ = M.IsIndexValid
 
 -- Export the module.
 return M
