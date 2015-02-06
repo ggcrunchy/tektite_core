@@ -101,6 +101,13 @@ end
 --- DOCME
 -- @array arr
 -- @uint index
+function M.ClearSlot (arr, index)
+	arr[-index] = nil
+end
+
+--- DOCME
+-- @array arr
+-- @uint index
 -- @param[opt="id"] id
 function M.MarkSlot_ID (arr, index, id)
 	arr[-index] = arr[id or "id"]
@@ -115,13 +122,42 @@ end
 
 --- DOCME
 -- @array arr
+-- @uint index
+-- @bool set
+-- @param[opt="id"] id
+function M.SetSlot_ID (arr, index, set, id)
+	local value
+
+	if set then
+		value = arr[id or "id"]
+	end
+
+	arr[-index] = value
+end
+
+--- DOCME
+-- @array arr
+-- @uint index
+-- @bool set
+function M.SetSlot_Zero (arr, index, set)
+	local value
+
+	if set then
+		value = arr[0]
+	end
+
+	arr[-index] = value
+end
+
+--- DOCME
+-- @array arr
 -- @uint[opt] n
 -- @treturn function X
 -- @treturn array _arr_.
 function M.Wrap (arr, n)
 	local gen_id = 0
 
-	return function(what, index)
+	return function(what, index, arg)
 		-- Check --
 		-- index: Index in array to check
 		if what == "check" then
@@ -131,6 +167,17 @@ function M.Wrap (arr, n)
 		-- index: Index in array to mark
 		elseif what == "mark" then
 			arr[-index] = gen_id
+
+		-- Set --
+		-- index: Index in array to set
+		-- arg: If true, mark the index; otherwise, clear it
+		elseif what == "set" then
+			arr[-index] = arg and gen_id or nil
+
+		-- Clear --
+		-- index: Index in array to clear
+		elseif what == "clear" then
+			arr[-index] = nil
 
 		-- Begin Generation --
 		elseif what == "begin_generation" then
