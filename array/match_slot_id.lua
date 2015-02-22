@@ -64,7 +64,7 @@ local function AuxBeginGeneration (arr, key, n)
 	-- long it would take to increment these to overflow.
 	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
 
-	arr[key], arr[-gen_id] = gen_id
+	arr[key], arr[-(gen_id + 1)] = gen_id
 end
 
 --- DOCME
@@ -183,7 +183,7 @@ function M.Wrap (arr, n)
 		elseif what == "begin_generation" then
 			gen_id = RotateIndex(gen_id, n or #arr) -- see the comment in AuxBeginGeneration()
 
-			arr[-gen_id] = nil
+			arr[-(gen_id + 1)] = nil
 
 		-- Get Array --
 		elseif what == "get_array" then
