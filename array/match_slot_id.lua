@@ -149,6 +149,9 @@ function M.SetSlot_Zero (arr, index, set)
 	arr[-index] = value
 end
 
+-- --
+local Commands = { check = true, clear = false, mark = true, set = true }
+
 --- DOCME
 -- @array arr
 -- @uint[opt] n
@@ -158,26 +161,25 @@ function M.Wrap (arr, n)
 	local gen_id = 0
 
 	return function(what, index, arg)
-		-- Check --
-		-- index: Index in array to check
-		if what == "check" then
-			return arr[-index] == gen_id
+		-- Check / Clear / Mark / Set --
+		-- index: Index in array to check / clear / mark / set
+		-- Return: Was the index marked ("check")? Or did it change (otherwise)?
+		local how = Commands[what]
 
-		-- Mark --
-		-- index: Index in array to mark
-		elseif what == "mark" then
-			arr[-index] = gen_id
+		if how ~= nil then
+			local marked = arr[-index] == gen_id
 
-		-- Set --
-		-- index: Index in array to set
-		-- arg: If true, mark the index; otherwise, clear it
-		elseif what == "set" then
-			arr[-index] = arg and gen_id or nil
+			if what ~= "check" then
+				if what == "set" then
+					how = arg
+				end
 
-		-- Clear --
-		-- index: Index in array to clear
-		elseif what == "clear" then
-			arr[-index] = nil
+				arr[-index] = how and gen_id or nil
+
+				return marked == not how
+			else
+				return marked
+			end
 
 		-- Begin Generation --
 		elseif what == "begin_generation" then
