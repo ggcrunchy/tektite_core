@@ -44,15 +44,8 @@ local _NewSchema_
 -- Exports --
 local M = {}
 
---- DOCME
--- @ptable t Table to read.
--- @tparam ?|table|function schema As per @{NewSchema}.
--- @tparam[opt] callable op
--- @treturn function Reader function, called as
---    value = reader(name, how)
--- TODO: MORE
-function M.NewReader (t, schema, op)
-	assert(t, "Missing table to read")
+-- Common reader body
+local function AuxNewReader (t, schema, op)
 	assert(op == nil or var_preds.IsCallable(op), "Uncallable op")
 
 	schema, op = _NewSchema_(schema), op or assert
@@ -68,6 +61,32 @@ function M.NewReader (t, schema, op)
 
 		return nil
 	end
+end
+
+--- DOCME
+-- @ptable t Table to read.
+-- @tparam ?|table|function schema As per @{NewSchema}.
+-- @tparam[opt] callable op
+-- @treturn function Reader function, called as
+--    value = reader(name, how)
+-- TODO: MORE
+function M.NewReader (t, schema, op)
+	assert(type(t) == "table", "Missing table to read")
+
+	return AuxNewReader(t, schema, op)
+end
+
+--- Variant of @{NewReader} which allows for missing tables.
+-- @ptable[opt] t Table to read.
+-- @tparam ?|table|function schema As per @{NewSchema}.
+-- @tparam[opt] callable op
+-- @treturn function Reader function, called as
+--    value = reader(name, how)
+-- TODO: MORE
+function M.NewReader_OptTable (t, schema, op)
+	assert(t == nil or type(t) == "table", "Missing table to read")
+
+	return AuxNewReader(t, schema, op)
 end
 
 -- Checks whether a variable is callable or nil
@@ -210,6 +229,8 @@ end
 -- Registered schemas --
 local Schemas = setmetatable({}, { __mode = "k" })
 
+-- CONSIDER: Extended types, e.g. "int", "uint", "posint", special strings, etc.
+
 --- DOCME
 -- @tparam ?|table|function schema As a function, this must be a return value from an
 -- earlier call. In this case, the function is a no-op, returning _schema_.
@@ -271,10 +292,10 @@ function M.NewSchema (schema)
 		local defs = Copy(schema.defs)
 
 		function schema (t, name)
-			-- Check the key alternatives in order.
+			-- If a table exists, check the key alternatives in order.
 			local keys, res = into[name]
 
-			for i = 1, #(keys or "") do
+			for i = 1, #(t and keys or "") do
 				local key = keys[i]
 
 				-- Resolve the key to the entry's name, if necessary. This accounts for the case where a
@@ -317,7 +338,7 @@ function M.NewSchema (schema)
 			end
 		end
 
-		-- Register the schema to avoid spurious recomputation.
+		-- Register the schema to avoid recomputation.
 		Schemas[schema] = true
 	end
 
