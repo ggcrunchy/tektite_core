@@ -42,6 +42,12 @@ local _NewSchema_
 -- Exports --
 local M = {}
 
+-- TODO: Non-tables default to singletons...
+-- TODO: null, required as "true"
+-- TODO: predicates, types
+-- ^^^ Actually, redesign to incorporate into entries
+-- ^^^ Top-level defaults?
+
 --- DOCME
 -- @ptable t Table to read.
 -- @tparam ?|table|function schema As per @{NewSchema}.
