@@ -44,22 +44,22 @@ end
 -- @tparam Database db
 -- @string name Table name.
 -- @string key Key associated with value.
--- @string[opt="m_KEY"] column_name Name of key column.
+-- @string[opt="m_KEY"] key_column Name of key column.
 -- @return Value, if found, or **nil** otherwise.
-function M.GetOneValueInTable (db, name, key, column_name)
-	return Urows1(db, name, (column_name or [[m_KEY]]) .. [[ = ']] .. key .. [[']])
+function M.GetOneValueInTable (db, name, key, key_column)
+	return Urows1(db, name, (key_column or [[m_KEY]]) .. [[ = ']] .. key .. [[']])
 end
 
 -- --
-local KeyDataSchema = [[(m_KEY UNIQUE, m_DATA)]]
+local KeyDataColumns = [[(m_KEY UNIQUE, m_DATA)]]
 
 --
-local function EnsureTable (name, schema, def)
-	if schema then
-		schema = type(schema) == "string" and schema or def
+local function EnsureTable (name, columns, def)
+	if columns then
+		columns = type(columns) == "string" and columns or def
 
 		return [[
-			CREATE TABLE IF NOT EXISTS ]] .. name .. schema .. [[;
+			CREATE TABLE IF NOT EXISTS ]] .. name .. columns .. [[;
 		]]
 	else
 		return ""
@@ -74,8 +74,8 @@ local function AuxInsertOrReplace (name, key, data)
 end
 
 --- DOCME
-function M.InsertOrReplaceKeyData (db, name, key, data, schema)
-	db:exec(EnsureTable(name, schema, KeyDataSchema) .. AuxInsertOrReplace(name, key, data))
+function M.InsertOrReplaceKeyData (db, name, key, data, columns)
+	db:exec(EnsureTable(name, columns, KeyDataColumns) .. AuxInsertOrReplace(name, key, data))
 end
 
 --- Predicate.
