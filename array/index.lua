@@ -1,4 +1,4 @@
---- An assortment of useful index and interval operations.
+--- An assortment of useful index and range operations.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -36,28 +36,6 @@ local M = {}
 -- @treturn int Slot index.
 function M.FitToSlot (value, base, dim)
 	return floor((value - base) / dim) + 1
-end
-
---- Gets the cell components of a flat array index when the array is considered as a grid.
--- @int index Array index.
--- @uint w Grid row width.
--- @treturn int Column index.
--- @treturn int Row index.
--- @see CellToIndex
-function M.IndexToCell (index, w)
-	local quot = floor((index - 1) / w)
-
-	return index - quot * w, quot + 1
-end
-
---- Gets the index of a grid cell when that grid is considered as a flat array.
--- @int col Column index.
--- @int row Row index.
--- @uint w Grid row width.
--- @treturn int Index.
--- @see IndexToCell
-function M.CellToIndex (col, row, w)
-	return (row - 1) * w + col
 end
 
 --- Predicate.

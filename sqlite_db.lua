@@ -23,8 +23,8 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
--- Standard library imports --
-local type = type
+-- Cached module references --
+local _EnsureTable_
 
 -- Exports --
 local M = {}
@@ -51,31 +51,51 @@ function M.GetOneValueInTable (db, name, key, key_column)
 end
 
 -- --
-local KeyDataColumns = [[(m_KEY UNIQUE, m_DATA)]]
+local KeyDataColumns = [[m_KEY VARCHAR UNIQUE, m_DATA BLOB]]
+
+--- DOCME
+function M.DropTable (db, name)
+	db:exec([[
+		DROP TABLE IF EXISTS ]] .. name .. [[;
+	]])
+end
 
 --
-local function EnsureTable (name, columns, def)
-	if columns then
-		columns = type(columns) == "string" and columns or def
-
-		return [[
-			CREATE TABLE IF NOT EXISTS ]] .. name .. columns .. [[;
-		]]
-	else
-		return ""
+local function GetColumns (what)
+	if what == "key_data" then
+		return KeyDataColumns
 	end
+
+	return what
+end
+
+--- DOCME
+function M.EnsureTable (db, name, columns)
+	db:exec([[
+		CREATE TABLE IF NOT EXISTS ]] .. name .. [[ (]] .. GetColumns(columns) .. [[);
+	]])
 end
 
 --
 local function AuxInsertOrReplace (name, key, data)
 	return [[
-		INSERT OR REPLACE INTO ]] .. name .. [[ VALUES(']] .. key .. [[', ']] .. data .. [[;');
+		INSERT OR REPLACE INTO ]] .. name .. [[ VALUES(']] .. key .. [[', ']] .. data .. [[');
 	]]
 end
 
 --- DOCME
-function M.InsertOrReplaceKeyData (db, name, key, data, columns)
-	db:exec(EnsureTable(name, columns, KeyDataColumns) .. AuxInsertOrReplace(name, key, data))
+function M.InsertOrReplace_KeyData (db, name, key, data, columns)
+	_EnsureTable_(db, name, columns or "key_data")
+
+	db:exec(AuxInsertOrReplace(name, key, data))
+end
+
+--- DOCME
+function M.NewTable (db, name, columns)
+	db:exec([[
+		DROP TABLE IF EXISTS ]] .. name .. [[;
+		CREATE TABLE ]] .. name .. [[ (]] .. GetColumns(columns) .. [[);
+	]])
 end
 
 --- Predicate.
@@ -83,10 +103,13 @@ end
 -- @string name Table name.
 -- @treturn boolean Table exists?
 function M.TableExists (db, name)
-	return Urows1(db, "sqlite_master", [[type = 'table' AND name = ']] .. name .. [[']]) or false
+	return Urows1(db, "sqlite_master", [[type = 'table' AND name = ']] .. name .. [[']]) ~= nil
 end
 
 -- TODO: Incorporate stuff from corona_utils.file, corona_utils.persistence
+
+-- Cache module members.
+_EnsureTable_ = M.EnsureTable
 
 -- Export the module.
 return M
