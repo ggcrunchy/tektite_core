@@ -152,13 +152,16 @@ function M.RemoveDups (arr, comp)
 	sort(arr, comp)
 
 	--
-	local prev
+	local n, prev = #arr
 
-	for i = #arr, 1, -1 do
-		if arr[i] == prev then
-			_Backfill_(arr, i)
+	for i = n, 1, -1 do
+		local cur = arr[i]
+
+		if cur == prev then
+			arr[i] = arr[n]
+			n, arr[n] = n - 1
 		else
-			prev = arr[i]
+			prev = cur
 		end
 	end
 end
@@ -179,9 +182,6 @@ end
 
 -- Register bound-table functions.
 GetTable = bound_args.Register{ M.ArrayOfTables, M.GetFields, M.GetKeys }
-
--- Cache module members.
-_Backfill_ = M.Backfill
 
 -- Export the module.
 return M
