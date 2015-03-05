@@ -44,6 +44,16 @@ local _NewSchema_
 -- Exports --
 local M = {}
 
+-- Registered schemas --
+local Schemas = setmetatable({}, { __mode = "k" })
+
+--- DOCME
+-- @param schema
+-- @treturn boolean
+function M.IsSchema (schema)
+	return Schemas[schema] ~= nil
+end
+
 -- Common reader body
 local function AuxNewReader (t, schema, op)
 	assert(op == nil or var_preds.IsCallable(op), "Uncallable op")
@@ -189,7 +199,7 @@ end
 
 -- Helper to choose a value which may be in either of two tables
 local function Choose (t1, t2, name)
-	local first = t1[name]
+	local first = t1 and t1[name]
 
 	if first == nil then
 		return t2.name
@@ -226,10 +236,10 @@ local function TypeCheck (res, entry, aux)
 	end
 end
 
--- Registered schemas --
-local Schemas = setmetatable({}, { __mode = "k" })
-
 -- CONSIDER: Extended types, e.g. "int", "uint", "posint", special strings, etc.
+-- ^^^ Also def_funcs (take callable, + lookup keys)
+-- ^^^ Array form for type checks, predicates
+-- ^^^ DSL for strictly string-type multi-type check
 
 --- DOCME
 -- @tparam ?|table|function schema As a function, this must be a return value from an
@@ -269,22 +279,53 @@ function M.NewSchema (schema)
 
 		-- Add any alt group entries.
 		if CheckTable(schema.alt_groups, "Non-table alt group collection") then
-			for gname, group in pairs(schema.alt_groups) do
+			for k, group in pairs(schema.alt_groups) do
 				local entries = GroupCopy(CheckTable(group, "Non-table alt group"))
+				local prefix, gname = group.prefixed, k
+				local ptype, n = type(prefix), 1
 
-				for _, entry in ipairs(entries) do
-					-- If requested, prefix each alternative with the group name.
-					if group.prefixed then
-						for i, v in ipairs(entry) do
-							entry[i] = gname .. v
-						end
-					end
+				--
+				if ptype == "table" then
+					n = #prefix
 
-					-- Add the group name as the final alternative.
-					entry[#entry + 1] = gname
+					assert(n > 0, "Empty string prefix array")
+
+				elseif ptype == "string" then
+					gname = prefix .. gname
+				elseif prefix then
+					prefix = gname
 				end
 
-				AddEntries(into, aux, entries)
+				--
+				for i = 1, n do
+					local pi, clone = prefix, i < n and table_funcs.Copy(entries)
+
+					if ptype == "table" then
+						pi = prefix[i]
+
+						assert(type(pi) == "string", "Non-string prefix entry")
+
+						gname = pi .. gname
+					end
+
+					for _, entry in ipairs(entries) do
+						-- If requested, prepend the prefix or group name to each alternative. Where a prefix
+						-- was provided, prepend it to the group name as well.
+						if pi then
+							for i, v in ipairs(entry) do
+								entry[i] = pi .. v
+							end
+						end
+
+						-- Add the group name as the final alternative.
+						entry[#entry + 1] = gname
+					end
+
+					AddEntries(into, aux, entries)
+
+					--
+					entries = clone
+				end
 			end
 		end
 
@@ -293,14 +334,26 @@ function M.NewSchema (schema)
 
 		function schema (t, name)
 			-- If a table exists, check the key alternatives in order.
-			local keys, res = into[name]
+			local keys, n, res = into[name], 0
 
-			for i = 1, #(t and keys or "") do
+			if t then
+				n = keys and #keys or 1
+			end
+
+			for i = 1, n do
+				-- Find the key pertaining to the given alternative. If checking the table itself, this
+				-- is just the name from before.
 				local key = keys[i]
 
-				-- Resolve the key to the entry's name, if necessary. This accounts for the case where a
-				-- garbage-collected object was used both as the name and as one of the alternatives.
-				if key == _name then
+				if keys then
+					key = keys[i]
+
+					-- Resolve the key to the entry's name, if necessary. This accounts for the case where a
+					-- garbage-collected object was used both as the name and as one of the alternatives.
+					if key == _name then
+						key = name
+					end
+				else
 					key = name
 				end
 

@@ -66,7 +66,7 @@ local CellToIndexLayout = {
 		return row * w + col
 	end,
 
-	-- weird grid (see tiling sample)... maybe two-tiered grid? (or blocks, as used below)
+	-- weird grid (see tiling sample)... maybe two-tiered grid? (or blocks, as used below) (or grid of grids)
 	--[[
 		-- "Logical" grid dimensions (i.e. before being broken down into subgrids)... --
 		local NCols_Log, NRows_Log = 15, 10 <- w, h (only need w)
