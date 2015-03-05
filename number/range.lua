@@ -89,6 +89,13 @@ function M.MinMax_N (a, b, n)
 	return max(a, 1), min(b, n)
 end
 
+--- DOCME
+function M.MinMax_New (a, b, new)
+	a, b = _MinMax_(a or new, b or new)
+
+	return min(a, new), max(b, new)
+end
+
 --- Rounds a number to the nearest multiple of some increment.
 -- @number n Number to round.
 -- @number[opt=1] inc Increment.
