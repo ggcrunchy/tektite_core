@@ -28,6 +28,7 @@ local assert = assert
 local format = string.format
 local ipairs = ipairs
 local pairs = pairs
+local rawequal = rawequal
 local tostring = tostring
 local type = type
 
@@ -38,6 +39,8 @@ local var_preds = require("tektite_core.var.predicates")
 
 -- Cookies --
 local _name = {}
+local _nil = {}
+local _pending = {}
 
 -- Cached module references --
 local _NewSchema_
@@ -290,43 +293,59 @@ local AuxDoSchema
 local ArgsCache = cache.TableCache("unpack_and_wipe")
 
 --
-local function TryDefaults (t, name, into, aux, def_vals, def_val_funcs)
-	local func = def_val_funcs and def_val_funcs[name]
+local function TryDefaults (t, name, into, aux, def_vals, def_val_funcs, guard)
+	local func, def = def_val_funcs and def_val_funcs[name]
 
 	if func then
-		local n, args = #func
+		-- Look up each argument using the schema itself. If a lookup fails along the way, report
+		-- it and recache the arguments.
+		local n, args = #func - 1
 
-		--
-		if n > 1 then
+		if n > 0 then
 			args = ArgsCache("pull")
 
-			for i = 2, n do
-				local state, res, message = AuxDoSchema(t, func[i], into, aux, def_vals, def_val_funcs)
+			for i = 1, n do
+				local state, res, message = AuxDoSchema(t, func[i + 1], into, aux, def_vals, def_val_funcs, guard)
 
 				if state == "found" then
-					args[#args + 1] = res
+					args[i] = res
 				else
-					ArgsCache(args)
+					ArgsCache(args, i - 1)
 
 					return state, res, message
 				end
 			end
 		end
 
-		--
-		if not args then
-			return func[1]()
+		-- Call the default function, passing in (and recaching) any arguments.
+		if args then
+			def = func[1](ArgsCache(args, n))
 		else
-			return func[1](ArgsCache(args))
+			def = func[1]()
 		end
+	else
+		def = def_vals and def_vals[name]
 	end
 
-	--
-	return def_vals and def_vals[name]
+	return def
 end
 
 --
-function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs)
+function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs, guard)
+	-- Check for conflicts, reporting any. If the value was already found, return it.
+	local cached = guard[name]
+
+	if rawequal(cached, _pending) then
+		return "cycle", format("Lookup cycle with field <%s>", tostring(name)), ""
+	elseif rawequal(cached, _nil) then
+		return "found", nil
+	elseif cached ~= nil then
+		return "found", cached
+	end
+
+	-- Guard against cycles.
+	guard[name] = _pending
+
 	-- If a table exists, check the key alternatives in order.
 	local keys, n = into[name], 0
 
@@ -344,7 +363,7 @@ function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs)
 
 			-- Resolve the key to the entry's name, if necessary. This accounts for the case where a
 			-- garbage-collected object was used both as the name and as one of the alternatives.
-			if key == _name then
+			if rawequal(key, _name) then
 				key = name
 			end
 		else
@@ -362,6 +381,8 @@ function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs)
 				ok, err = TryPredicate(tres, keys, aux)
 
 				if ok then
+					guard[name] = tres
+
 					return "found", tres
 				end
 			end
@@ -373,11 +394,13 @@ function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs)
 	-- No result was found, so try to find a default, returning one if available (on failure,
 	-- report an error). Otherwise, check whether nil itself is acceptable, which if so is also
 	-- interpreted as found.
-	local def_, err, message = TryDefaults(t, name, into, aux, def_vals, def_val_funcs)
+	local def_, err, message = TryDefaults(t, name, into, aux, def_vals, def_val_funcs, guard)
 
 	if err then
 		return def_, err, message
 	elseif def_ ~= nil or ReadBool(keys, aux, "null_ok") then
+		guard[name] = def_ == nil and _nil or def_
+
 		return "found", def_
 
 	-- The result is indeed missing; report as much, including whether it was also required.
@@ -386,6 +409,20 @@ function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs)
 	else
 		return "missing", "Missing entry", keys and keys.message or ""
 	end
+end
+
+-- --
+local Guards = cache.TableCache()
+
+--
+local function Return (guard, ...)
+	for k in pairs(guard) do
+		guard[k] = nil
+	end
+
+	Guards(guard)
+
+	return ...
 end
 
 -- CONSIDER: Extended types, e.g. "int", "uint", "posint", special strings, etc.
@@ -412,7 +449,7 @@ end
 -- * def_val_funcs:
 -- @treturn function Schema function, called as
 --    state, result, message = schema_func(t, name)
--- where _state_ indicates one of three outcomes of the lookup.
+-- where _state_ indicates one of three outcomes of the lookup. TODO: "cycle"
 --
 -- When _state_ is **"found"**, _result_ is the value that was looked up in _t_.
 --
@@ -424,13 +461,16 @@ function M.NewSchema (schema)
 	assert(type(schema) == "table" or exists, "Invalid schema")
 
 	if not exists then
-		-- Prepare any default auxiliary information
+		-- Prepare any default auxiliary information.
 		local aux, into = ProcessAuxFields{
+		--	mapping = { schema.def_mapping, "func", "Uncallable mapping" },
 			null_ok = { schema.def_null_ok, "bool" },
+			predicate = { schema.def_predicate, "func", "Uncallable predicate" },
+		--	predicate_list = { schema.def_predicate_list, "func_array", "Ambiguous predicate: both singleton and list", "predicate" },
 			required = { schema.def_required, "bool" },
 			type = { schema.def_type },
-			predicate = { schema.def_predicate, "func", "Uncallable predicate" },
-			type_func = { schema.def_type_func, "func", "Uncallable type function" }
+			type_func = { schema.def_type_func, "func", "Uncallable type function" },
+		--	type_list = { schema.def_type_list, "array", "Ambiguous type: both singleton and list", "type" }
 		}, {}
 
 		-- Add any alts table entries.
@@ -489,7 +529,11 @@ function M.NewSchema (schema)
 		end
 
 		function schema (t, name)
-			return AuxDoSchema(t, name, into, aux, def_vals, def_val_funcs)
+			assert(name ~= nil, "Nil name supplied to schema")
+
+			local guard = Guards("pull")
+
+			return Return(guard, AuxDoSchema(t, name, into, aux, def_vals, def_val_funcs, guard))
 		end
 
 		-- Register the schema to avoid recomputation.

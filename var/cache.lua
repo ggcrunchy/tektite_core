@@ -26,8 +26,8 @@
 
 -- Standard library imports --
 local assert = assert
-local remove = table.remove
 local pcall = pcall
+local remove = table.remove
 local setmetatable = setmetatable
 local type = type
 
