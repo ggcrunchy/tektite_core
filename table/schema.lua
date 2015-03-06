@@ -32,6 +32,7 @@ local tostring = tostring
 local type = type
 
 -- Modules --
+local cache = require("tektite_core.var.cache")
 local table_funcs = require("tektite_core.table.funcs")
 local var_preds = require("tektite_core.var.predicates")
 
@@ -54,22 +55,45 @@ function M.IsSchema (schema)
 	return Schemas[schema] ~= nil
 end
 
+-- --
+local CacheMode = { cache = true, cache_lax = "lax", cache_strict = "strict" }
+
 -- Common reader body
 local function AuxNewReader (t, schema, op)
 	assert(op == nil or var_preds.IsCallable(op), "Uncallable op")
 
 	schema, op = _NewSchema_(schema), op or assert
 
-	return function(name, how)
-		local state, res_, message = schema(t, name)
+	local cache
 
-		if state == "found" then
-			return res_
-		elseif how == "strict" or (how ~= "lax" and state == "violation") then
-			op(false, format("Field <%s>: %s%s", tostring(name), res_, format(#message > 0 and " (%s)" or "", message)))
+	return function(name, how)
+		--
+		local v = cache and cache[name]
+
+		if v == nil then
+			--
+			local state, res_, message = schema(t, name)
+
+			if state == "found" then
+				if CacheMode[how] then
+					cache = cache or {}
+
+					cache[name] = res_
+				end
+
+				return res_
+
+			--
+			else
+				how = CacheMode[how] or how
+
+				if how == "strict" or (how ~= "lax" and state == "violation") then
+					op(false, format("Field <%s>: %s%s", tostring(name), res_, format(#message > 0 and " (%s)" or "", message)))
+				end
+			end
 		end
 
-		return nil
+		return v
 	end
 end
 
@@ -208,6 +232,29 @@ local function Choose (t1, t2, name)
 	end
 end
 
+--
+local function GetPrefix (group, gname)
+	local prefix, n = group.prefixed
+	local ptype = type(prefix)
+
+	--
+	if ptype == "table" then
+		n = #prefix
+
+		assert(n > 0, "Empty string prefix array")
+
+	--
+	elseif ptype == "string" then
+		gname = prefix .. gname
+
+	--
+	elseif prefix then
+		prefix = gname
+	end
+
+	return prefix, gname, n
+end
+
 -- Chooses and runs a predicate, if it exists
 local function TryPredicate (res, entry, aux)
 	local pred, err = Choose(entry, aux, "predicate")
@@ -224,7 +271,7 @@ local function TypeCheck (res, entry, aux)
 	local expected = Choose(entry, aux, "type")
 
 	if expected == nil then
-		return entry.type_func == nil, "Entry has type function, but no type to check"
+		return (entry and entry.type_func) == nil, "Entry has type function, but no type to check"
 	end
 
 	local res_type = (Choose(entry, aux, "type_func") or type)(res)
@@ -236,9 +283,114 @@ local function TypeCheck (res, entry, aux)
 	end
 end
 
+-- Forward declaration --
+local AuxDoSchema
+
+-- --
+local ArgsCache = cache.TableCache("unpack_and_wipe")
+
+--
+local function TryDefaults (t, name, into, aux, def_vals, def_val_funcs)
+	local func = def_val_funcs and def_val_funcs[name]
+
+	if func then
+		local n, args = #func
+
+		--
+		if n > 1 then
+			args = ArgsCache("pull")
+
+			for i = 2, n do
+				local state, res, message = AuxDoSchema(t, func[i], into, aux, def_vals, def_val_funcs)
+
+				if state == "found" then
+					args[#args + 1] = res
+				else
+					ArgsCache(args)
+
+					return state, res, message
+				end
+			end
+		end
+
+		--
+		if not args then
+			return func[1]()
+		else
+			return func[1](ArgsCache(args))
+		end
+	end
+
+	--
+	return def_vals and def_vals[name]
+end
+
+--
+function AuxDoSchema (t, name, into, aux, def_vals, def_val_funcs)
+	-- If a table exists, check the key alternatives in order.
+	local keys, n = into[name], 0
+
+	if t then
+		n = keys and #keys or 1
+	end
+
+	for i = 1, n do
+		-- Find the key pertaining to the given alternative. If checking the table itself, this
+		-- is just the name from before.
+		local key
+
+		if keys then
+			key = keys[i]
+
+			-- Resolve the key to the entry's name, if necessary. This accounts for the case where a
+			-- garbage-collected object was used both as the name and as one of the alternatives.
+			if key == _name then
+				key = name
+			end
+		else
+			key = name
+		end
+
+		-- Look up the key. If a result was found, check it for integrity. If all is well, return
+		-- the result; otherwise, report a violation.
+		local tres = t[key]
+
+		if tres ~= nil then
+			local ok, err = TypeCheck(tres, keys, aux)
+
+			if ok then
+				ok, err = TryPredicate(tres, keys, aux)
+
+				if ok then
+					return "found", tres
+				end
+			end
+
+			return "violation", err, keys and keys.message or ""
+		end
+	end
+
+	-- No result was found, so try to find a default, returning one if available (on failure,
+	-- report an error). Otherwise, check whether nil itself is acceptable, which if so is also
+	-- interpreted as found.
+	local def_, err, message = TryDefaults(t, name, into, aux, def_vals, def_val_funcs)
+
+	if err then
+		return def_, err, message
+	elseif def_ ~= nil or ReadBool(keys, aux, "null_ok") then
+		return "found", def_
+
+	-- The result is indeed missing; report as much, including whether it was also required.
+	elseif ReadBool(keys, aux, "required") then
+		return "violation", "Required entry is missing", keys and keys.message or ""
+	else
+		return "missing", "Missing entry", keys and keys.message or ""
+	end
+end
+
 -- CONSIDER: Extended types, e.g. "int", "uint", "posint", special strings, etc.
--- ^^^ Also def_funcs (take callable, + lookup keys)
 -- ^^^ Array form for type checks, predicates
+-- ^^^ Post-lookup mapping
 -- ^^^ DSL for strictly string-type multi-type check
 
 --- DOCME
@@ -246,9 +398,18 @@ end
 -- earlier call. In this case, the function is a no-op, returning _schema_.
 --
 -- TODO: AS A TABLE
--- * alts:
 -- * alt_groups:
--- * defs:
+-- * alts:
+-- * def_mapping:
+-- * def_null_ok:
+-- * def_predicate:
+-- * def_predicate_list:
+-- * def_required:
+-- * def_type:
+-- * def_type_func:
+-- * def_type_list:
+-- * def_vals:
+-- * def_val_funcs:
 -- @treturn function Schema function, called as
 --    state, result, message = schema_func(t, name)
 -- where _state_ indicates one of three outcomes of the lookup.
@@ -280,32 +441,20 @@ function M.NewSchema (schema)
 		-- Add any alt group entries.
 		if CheckTable(schema.alt_groups, "Non-table alt group collection") then
 			for k, group in pairs(schema.alt_groups) do
-				local entries = GroupCopy(CheckTable(group, "Non-table alt group"))
-				local prefix, gname = group.prefixed, k
-				local ptype, n = type(prefix), 1
+				CheckTable(group, "Non-table alt group")
 
 				--
-				if ptype == "table" then
-					n = #prefix
+				local prefix, gname, n = GetPrefix(group, k)
 
-					assert(n > 0, "Empty string prefix array")
+				for i = 1, n or 1 do
+					local entries, pi = GroupCopy(group), prefix
 
-				elseif ptype == "string" then
-					gname = prefix .. gname
-				elseif prefix then
-					prefix = gname
-				end
-
-				--
-				for i = 1, n do
-					local pi, clone = prefix, i < n and table_funcs.Copy(entries)
-
-					if ptype == "table" then
+					if n then
 						pi = prefix[i]
 
 						assert(type(pi) == "string", "Non-string prefix entry")
 
-						gname = pi .. gname
+						gname = pi .. k
 					end
 
 					for _, entry in ipairs(entries) do
@@ -322,73 +471,25 @@ function M.NewSchema (schema)
 					end
 
 					AddEntries(into, aux, entries)
-
-					--
-					entries = clone
 				end
 			end
 		end
 
 		-- Install any defaults table and create the schema function.
-		local defs = Copy(schema.defs)
+		local def_vals, def_val_funcs = Copy(schema.def_vals, "Non-table default values")
+
+		if CheckTable(schema.def_val_funcs, "Non-table def value funcs") then
+			def_val_funcs = {}
+
+			for k, func in pairs(schema.def_val_funcs) do
+				CheckCallable(func[1] or false, "Uncallable def value func")
+
+				def_val_funcs[k] = func
+			end
+		end
 
 		function schema (t, name)
-			-- If a table exists, check the key alternatives in order.
-			local keys, n, res = into[name], 0
-
-			if t then
-				n = keys and #keys or 1
-			end
-
-			for i = 1, n do
-				-- Find the key pertaining to the given alternative. If checking the table itself, this
-				-- is just the name from before.
-				local key = keys[i]
-
-				if keys then
-					key = keys[i]
-
-					-- Resolve the key to the entry's name, if necessary. This accounts for the case where a
-					-- garbage-collected object was used both as the name and as one of the alternatives.
-					if key == _name then
-						key = name
-					end
-				else
-					key = name
-				end
-
-				-- Look up the key. If a result was found, check it for integrity. If all is well, return
-				-- the result; otherwise, report a violation.
-				res = t[key]
-
-				if res ~= nil then
-					local ok, err = TypeCheck(res, keys, aux)
-
-					if ok then
-						ok, err = TryPredicate(res, keys, aux)
-
-						if ok then
-							return "found", res
-						end
-					end
-
-					return "violation", err, keys.message
-				end
-			end
-
-			-- No result was found, so try to find a default, returning one if available. Otherwise,
-			-- check whether nil itself is acceptable, which if so is also interpreted as found.
-			res = defs and defs[name]
-
-			if res ~= nil or ReadBool(keys, aux, "null_ok") then
-				return "found", res
-
-			-- The result is indeed missing; report as much, including whether it was also required.
-			elseif ReadBool(keys, aux, "required") then
-				return "violation", "Required entry is missing", keys and keys.message or ""
-			else
-				return "missing", "Missing entry", keys and keys.message or ""
-			end
+			return AuxDoSchema(t, name, into, aux, def_vals, def_val_funcs)
 		end
 
 		-- Register the schema to avoid recomputation.
