@@ -35,6 +35,7 @@ local IsCallable = var_preds.IsCallable
 -- Cached module references --
 local _CellToIndex_
 local _IndexToCell_
+local _PosToCell_
 
 -- Exports --
 local M = {}
@@ -95,19 +96,21 @@ function M.CellToIndex_Layout (col, row, w, h, layout)
 	return layout(col, row, w, h)
 end
 
+--
+local function InGrid (ncols, nrows, col, row)
+	return col >= 1 and col <= ncols and row >= 1 and row <= nrows, col, row
+end
+
 --- DOCME
 function M.GridChecker (w, h, ncols, nrows)
 	return function(x, y, xbase, ybase)
-		x, y = x - (xbase or 0), y - (ybase or 0)
-
-		local col, row = floor(x / w) + 1, floor(y / h) + 1
-
-		if col >= 1 and col <= ncols and row >= 1 and row <= nrows then
-			return true, col, row
-		else
-			return false
-		end
+		return InGrid(ncols, nrows, _PosToCell_(x, y, w, h, xbase, ybase))
 	end
+end
+
+--
+local function OffsetFromBlockOffset (bcoord, n_in_block, pos, bdim, frac)
+	return bcoord * n_in_block + floor((pos - bcoord * bdim) * frac) + 1
 end
 
 --- DOCME
@@ -115,18 +118,30 @@ function M.GridChecker_Blocks (block_w, block_h, nblock_cols, nblock_rows, cols_
 	local cfrac, rfrac = cols_in_block / block_w, rows_in_block / block_h
 
 	return function(x, y, xbase, ybase)
-		x, y = x - (xbase or 0), y - (ybase or 0)
+		local in_grid, bcol, brow = InGrid(nblock_cols, nblock_rows, _PosToCell_(x, y, block_w, block_h, xbase, ybase))
+		local col = OffsetFromBlockOffset(bcol, cols_in_block, x, block_w, cfrac)
+		local row = OffsetFromBlockOffset(brow, rows_in_block, y, block_h, rfrac)
 
-		local bcol, brow = floor(x / block_w), floor(y / block_h)
+		return in_grid, col, row, bcol + 1, brow + 1
+	end
+end
 
-		if bcol >= 0 and bcol < nblock_cols and brow >= 0 and brow < nblock_rows then
-			local col = bcol * cols_in_block + floor((x - bcol * block_w) * cfrac) + 1
-			local row = brow * rows_in_block + floor((y - brow * block_h) * rfrac) + 1
+--
+local function AuxGridChecker_Cell (coff, roff, ncols, nrows, col, row)
+	return InGrid(ncols, nrows, col + (coff or 0), row + (roff or 0))
+end
 
-			return true, col, row, bcol + 1, brow + 1
-		else
-			return false
-		end
+--- DOCME
+function M.GridChecker_Cell (ncols, nrows)
+	return function(col, row, coff, roff)
+		return AuxGridChecker_Cell(coff, roff, ncols, nrows, col, row)
+	end
+end
+
+--- DOCME
+function M.GridChecker_Offset (w, h, ncols, nrows)
+	return function(x, y, coff, roff)
+		return InGrid(coff, roff, ncols, nrows, _PosToCell_(x, y, w, h))
 	end
 end
 
@@ -174,9 +189,24 @@ function M.IndexToCell_Layout (index, w, h, layout)
 	return layout(index, w, h)
 end
 
+--- DOCME
+function M.PosToCell (x, y, w, h, xbase, ybase)
+	x, y = x - (xbase or 0), y - (ybase or 0)
+
+	return floor(x / w) + 1, floor(y / h) + 1
+end
+
+--- DOCME
+function M.PosToCell_Func (w, h)
+	return function(x, y, xbase, ybase)
+		return _PosToCell_(x, y, w, h, xbase, ybase)
+	end
+end
+
 -- Cache module members.
 _CellToIndex_ = M.CellToIndex
 _IndexToCell_ = M.IndexToCell
+_PosToCell_ = M.PosToCell
 
 --[=[
 -- --
