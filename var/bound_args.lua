@@ -34,11 +34,11 @@ local type = type
 -- Modules --
 local var_preds = require("tektite_core.var.predicates")
 
--- Imports --
-local IsCallable = var_preds.IsCallable
-
 -- Cookies --
 local _bind = {}
+
+-- Imports --
+local IsCallable = var_preds.IsCallable
 
 -- Exports --
 local M = {}

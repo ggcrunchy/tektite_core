@@ -42,7 +42,7 @@ local operators = require("bitwise_ops.operators")
 local band
 local bor
 
--- Module table --
+-- Exports --
 local M = {}
 
 -- Index loop when index sums exceed 256 --

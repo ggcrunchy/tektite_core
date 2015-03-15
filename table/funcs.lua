@@ -38,15 +38,15 @@ local type = type
 local bound_args = require("tektite_core.var.bound_args")
 local wipe = require("tektite_core.array.wipe")
 
+-- Cookies --
+local _self = {}
+
 -- Imports --
 local WipeRange = wipe.WipeRange
 local WithBoundTable = bound_args.WithBoundTable
 
 -- Cached module references --
 local _Map_
-
--- Cookies --
-local _self = {}
 
 -- Exports --
 local M = {}
