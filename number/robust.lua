@@ -37,19 +37,17 @@ local M = {}
 -- TODO: Specialize for complex numbers, vectors?
 
 --- DOCME
-function M.AngleBetween_OutParam (dot, len, add, negate)
-	return function(a, b)
-		if dot(a, b) < 0 then
-			add(a, a, b)
-			negate(a, a)
+function M.AngleBetween (dot, len, sub)
+	return function(a, b, out)
+		local neg = dot(a, b) < 0
 
-			return pi - 2 * asin(.5 * len(a))
-		else
-			negate(a, a)
-			add(a, a, b)
+		out = out or a
 
-			return 2 * asin(.5 * len(a))
-		end
+		sub(out, b, a)
+
+		local angle = 2 * asin(len(out) / 2)
+
+		return neg and pi - angle or angle
 	end
 end
 
@@ -59,8 +57,10 @@ function M.SinOverX (x)
 end
 
 --- DOCME
-function M.Slerp (t, theta, denom)
-	return _SinOverX_(t * theta) / (denom or _SinOverX_(theta)) * t
+function M.SlerpCoeffs (t, theta)
+	local denom, _1mt = _SinOverX_(theta), 1 - t
+
+	return _SinOverX_(_1mt * theta) * _1mt / denom, _SinOverX_(t * theta) * t / denom
 end
 
 -- Cache module members.
