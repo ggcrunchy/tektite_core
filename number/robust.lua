@@ -58,9 +58,9 @@ end
 
 --- DOCME
 function M.SlerpCoeffs (t, theta)
-	local denom, _1mt = _SinOverX_(theta), 1 - t
+	local denom, s = _SinOverX_(theta), 1 - t
 
-	return _SinOverX_(_1mt * theta) * _1mt / denom, _SinOverX_(t * theta) * t / denom
+	return _SinOverX_(s * theta) * s / denom, _SinOverX_(t * theta) * t / denom
 end
 
 -- Cache module members.
