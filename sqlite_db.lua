@@ -23,11 +23,53 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
+-- Standard library imports --
+local concat = table.concat
+
 -- Cached module references --
 local _EnsureTable_
 
 -- Exports --
 local M = {}
+
+--- DOCME
+function M.CachedReader ()
+	local CachedReader = {}
+
+	--- DOCME
+	function CachedReader:Begin ()
+		self.m_count = 0
+	end
+
+	--- DOCME
+	function CachedReader:End (db)
+		db:exec(concat(self, "", 1, self.m_count))
+
+		for i = #self, self.m_count + 1, -1 do -- try to remove some entries
+			self[i] = nil
+		end
+
+		self.m_count = 0
+	end
+
+	--- DOCME
+	function CachedReader:exec (str)
+		local count = self.m_count + 1
+
+		self[count] = str
+
+		self.m_count = count
+	end
+
+	return CachedReader
+end
+
+--- DOCME
+function M.DropTable (db, name)
+	db:exec([[
+		DROP TABLE IF EXISTS ]] .. name .. [[;
+	]])
+end
 
 -- Wrapper around common urows()-based pattern with "LIMIT 1"
 local function Urows1 (db, name, where)
@@ -52,13 +94,6 @@ end
 
 -- --
 local KeyDataColumns = [[m_KEY VARCHAR UNIQUE, m_DATA BLOB]]
-
---- DOCME
-function M.DropTable (db, name)
-	db:exec([[
-		DROP TABLE IF EXISTS ]] .. name .. [[;
-	]])
-end
 
 --
 local function GetColumns (what)
