@@ -202,5 +202,239 @@ function M.RemoveFromSet (t, k, v)
 	t[k] = AuxRemove(SetRemove, t[k], v)
 end
 
+--[=[
+
+
+--
+local function AuxAddToSet (cur, v)
+	if v ~= nil then
+		if cur ~= nil or type(v) == "table" then
+			if type(cur) ~= "table" then
+				cur = cur ~= nil and { [cur] = true } or {}
+			end
+
+			cur[v] = true
+		else
+			return v
+		end
+	end
+
+	return cur
+end
+
+--
+local function AuxAppend (cur, v)
+	if cur ~= nil or type(v) == "table" then
+		if type(cur) ~= "table" then
+			cur = { cur }
+		end
+
+		cur[#cur + 1] = v
+
+		return cur
+	else
+		return v
+	end
+end
+
+local function AuxRemoveFromArray (arr, v)
+	return AuxRemove(ArrayRemove, arr, v)
+end
+
+local function AuxRemoveFromSet (set, v)
+	return AuxRemove(SetRemove, set, v)
+end
+
+do -- empty set
+	local set
+
+	print("ITER EMPTY SET")
+	
+	vdump(set)
+
+	for k, v in M.IterSet(set) do
+		print("IES", k, v)
+	end
+
+	set = AuxAddToSet(set, nil)
+	
+	vdump(set)
+	print("")
+end
+
+do -- empty array
+	local arr
+
+	print("ITER EMPTY ARRAY")
+	
+	vdump(arr)
+
+	for i, v in M.IterArray(arr) do
+		print("IEA", i, v)
+	end
+
+	arr = AuxAppend(arr, nil)
+	
+	vdump(arr)
+	print("")
+end
+
+do -- one-element set
+	local set
+
+	set = AuxAddToSet(set, "one elem")
+
+	for k, v in M.IterSet(set) do
+		print("Iter 1-Elem. Set", k, v)
+	end
+	
+	vdump(set)
+
+	print("REMOVE?")
+
+	set = AuxRemoveFromSet(set, 338)
+
+	vdump(set)
+
+	print("REMOVE")
+
+	set = AuxRemoveFromSet(set, "one elem")
+
+	vdump(set)
+	print("")
+end
+
+do -- one-element array
+	local arr
+
+	arr = AuxAppend(arr, "DOG")
+
+	for i, v in M.IterArray(arr) do
+		print("Iter 1-Elem. Array", i, v)
+	end
+
+	vdump(arr)
+
+	print("REMOVE?")
+
+	arr = AuxRemoveFromArray(arr, 338)
+
+	vdump(arr)
+
+	print("REMOVE")
+
+	arr = AuxRemoveFromArray(arr, "DOG")
+
+	vdump(arr)
+	print("")
+end
+
+do -- one (table)-element set
+	local tv, set = {}
+
+	set = AuxAddToSet(set, tv)
+
+	for k, v in M.IterSet(set) do
+		print("Iter 1 Table-Elem. Set", k, v)
+	end
+	
+	vdump(set)
+
+	print("REMOVE?")
+
+	set = AuxRemoveFromSet(set, 338)
+
+	vdump(set)
+
+	print("REMOVE")
+
+	set = AuxRemoveFromSet(set, tv)
+
+	vdump(set)
+	print("")
+end
+
+do -- one (table)-element array
+	local tv, arr = {}
+
+	arr = AuxAppend(arr, tv)
+
+	for i, v in M.IterArray(arr) do
+		print("Iter 1 Table-Elem. Array", i, v)
+	end
+
+	vdump(arr)
+
+	print("REMOVE?")
+
+	arr = AuxRemoveFromArray(arr, 338)
+
+	vdump(arr)
+
+	print("REMOVE")
+
+	arr = AuxRemoveFromArray(arr, tv)
+
+	vdump(arr)
+	print("")
+end
+
+do -- set: table, then other
+	local set
+
+	set = AuxAddToSet(set, {})
+	set = AuxAddToSet(set, "one elem")
+
+	for k, v in M.IterSet(set) do
+		print("Iter 2-Elem. Set (table, then other)", k, v)
+	end
+	
+	vdump(set)
+	print("")
+end
+
+do -- array: table, then other
+	local arr
+
+	arr = AuxAppend(arr, {})
+	arr = AuxAppend(arr, "DOG")
+
+	for i, v in M.IterArray(arr) do
+		print("Iter 2-Elem. Array (table, then other)", i, v)
+	end
+
+	vdump(arr)
+	print("")
+end
+
+do -- set: other, then table
+	local set
+
+	set = AuxAddToSet(set, "one elem")
+	set = AuxAddToSet(set, {})
+
+	for k, v in M.IterSet(set) do
+		print("Iter 2-Elem. Set (other, then table)", k, v)
+	end
+	
+	vdump(set)
+	print("")
+end
+
+do -- array: other, then table
+	local arr
+
+	arr = AuxAppend(arr, "DOG")
+	arr = AuxAppend(arr, {})
+
+	for i, v in M.IterArray(arr) do
+		print("Iter 2-Elem. Array (other, then table)", i, v)
+	end
+
+	vdump(arr)
+	print("")
+end
+--]=]
+
 -- Export the module.
 return M
