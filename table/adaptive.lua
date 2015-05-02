@@ -1,15 +1,16 @@
---- Functionality for table members which may adapt among three forms:
+--- Functionality for containers which may adapt among three forms:
 --
 -- <ul>
 -- <li> **nil**. (0 elements)</li>
 -- <li> A non-table value. (1 element)</li>
--- <li> A table of non-table elements. (0 or more elements)</li>
+-- <li> A table of arbitrary values. (0 or more elements)</li>
 -- </ul>
 --
--- Members are assumed to be either an array or set (potential or actual), but not both.
+-- Containers are assumed to be either an array or set (potential or actual), but not both.
+-- These fall under the types **AdaptiveArray** and **AdaptiveSet**, respectively.
 --
 -- The operations in the module are intended to smooth away these details, allowing callers
--- to pretend the member in question is in table form.
+-- to pretend the container in question is in table form.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -38,72 +39,99 @@
 local ipairs = ipairs
 local next = next
 local pairs = pairs
+local rawequal = rawequal
 local remove = table.remove
 local type = type
+
+-- Cached module references --
+local _AddToSet_
+local _Append_
+local _RemoveFromArray_
+local _RemoveFromSet_
+local _SimplifyArray_
+local _SimplifySet_
 
 -- Exports --
 local M = {}
 
---- Adds an element to _t_&#91;_k_&#93; (treated as a set).
--- @ptable t Target table.
+--- Adds an element to an adaptive set.
+-- @tparam AdaptiveSet set
+-- @param v Value to add; **nil** is ignored.
+function M.AddToSet (set, v)
+	if v ~= nil then
+		-- If the container is a singleton, turn it into a one-element set. If the container
+		-- is now in table form, add the new element. Since tables as values are ambiguous,
+		-- they also go through this path; in this case, if no container yet exists, an empty
+		-- set is created.
+		if set ~= nil or type(v) == "table" then
+			if type(set) ~= "table" then
+				set = set ~= nil and { [set] = true } or {}
+			end
+
+			set[v] = true
+
+		-- First element added: singleton container.
+		else
+			return v
+		end
+	end
+
+	return set
+end
+
+--- Variant of @{AddToSet}, with `set = t[k]`.
+--
+-- The updated set is stored in _t_&#91;_k_&#93;.
+-- @ptable t Table to update.
 -- @param k Member key.
--- @param v Non-**nil** element to add.
-function M.AddToSet (t, k, v)
-	-- If the member already exists, add the new element to the set at its key. The member may
-	-- be a non-table, i.e. in singleton form, in which case the set / table must be created
-	-- (and the singleton also added) and put in its place.
-	local cur = t[k]
+-- @param v Value to add; **nil** is ignored.
+function M.AddToSet_Member (t, k, v)
+	t[k] = _AddToSet_(t[k], v)
+end
 
-	if cur ~= nil then
-		if type(cur) ~= "table" then
-			cur = { [cur] = true }
-
-			t[k] = cur
+--- Appends an element to an adaptive array.
+-- @tparam AdaptiveArray arr
+-- @param v Value to append; **nil** is ignored.
+-- @treturn AdapativeArray Updated array.
+function M.Append (arr, v)
+	-- If the container is a singleton, turn it into a one-element array. If the container
+	-- is now in table form, append the new element. Since tables as values are ambiguous,
+	-- they also go through this path; in this case, if no container yet exists, an empty
+	-- array is created.
+	if arr ~= nil or type(v) == "table" then
+		if type(arr) ~= "table" then
+			arr = { arr }
 		end
 
-		cur[v] = true
+		arr[#arr + 1] = v
 
-	-- First element added: assign it as a singleton.
+		return arr
+
+	-- First element added: singleton container.
 	else
-		t[k] = v
+		return v
 	end
 end
 
---- Appends an element to _t_&#91;_k_&#93; (treated as an array).
+--- Variant of @{Append}, with `arr = t[k]`.
+--
+-- The updated array is stored in _t_&#91;_k_&#93;.
 -- @ptable t Target table.
 -- @param k Member key.
--- @param v Non-**nil** element to add.
-function M.Append (t, k, v)
-	-- If the member already exists, append the new element to the array at its key. The member
-	-- may be a non-table, i.e. in singleton form, in which case the array / table must be
-	-- created (with the singleton as first element) and put in its place.
-	local cur = t[k]
-
-	if cur ~= nil then
-		if type(cur) ~= "table" then
-			cur = { cur }
-
-			t[k] = cur
-		end
-
-		cur[#cur + 1] = v
-
-	-- First element added: assign it as a singleton.
-	else
-		t[k] = v
-	end
+-- @param v Value to append; **nil** is ignored.
+function M.Append_Member (t, k, v)
+	t[k] = _Append_(t[k], v)
 end
 
 --- Predicate.
--- @param set Set-mode table member, i.e. _t_&#91;_k_&#93; after some combination of @{AddToSet}
--- and @{RemoveFromSet}.
+-- @tparam AdaptiveSet set Set to search.
 -- @param v Value to find.
 -- @treturn boolean _v_ is in _set_?
 function M.InSet (set, v)
 	if type(set) == "table" then
 		return set[v] ~= nil
 	else
-		return v ~= nil and set == v
+		return v ~= nil and rawequal(set, v)
 	end
 end
 
@@ -115,8 +143,7 @@ local function Single_Array (arr, i)
 end
 
 --- Iterates over the (0 or more) elements in the array.
--- @param arr Array-mode table member, i.e. _t_&#91;_k_&#93; after some combination of @{Append}
--- and @{RemoveFromArray} operations.
+-- @tparam AdaptiveArray arr Array to iterate.
 -- @treturn iterator Supplies index, value. If the value is a singleton, **true** is also
 -- supplied as a third result.
 function M.IterArray (arr)
@@ -135,8 +162,7 @@ local function Single_Set (set, guard)
 end
 
 --- Iterates over the (0 or more) elements in the set.
--- @param set Set-mode table member, i.e. _t_&#91;_k_&#93; after some combination of @{AddToSet}
--- and @{RemoveFromSet} operations.
+-- @tparam AdaptiveSet set Set to iterate.
 -- @treturn iterator Supplies value, boolean (if **true**, the set is in table form;
 -- otherwise, the value is a singleton).
 function M.IterSet (set)
@@ -147,294 +173,143 @@ function M.IterSet (set)
 	end
 end
 
--- Tries to remove a value from the adaptive container, returning nil if it became (or already was) empty
-local function AuxRemove (func, cur, v)
-	local has_more
-
-	if type(cur) == "table" then
-		has_more = func(cur, v) ~= nil
-	else
-		has_more = cur ~= v
+-- Tries to remove a value from the adaptive container, accounting for non-tables
+local function AuxRemove (func, cont, v)
+	if type(cont) == "table" then
+		func(cont, v)
+	elseif rawequal(cont, v) then
+		cont = nil
 	end
 
-	if has_more then
-		return cur
-	end
+	return cont
 end
 
 -- Tries to remove a value from an array-type adaptive container
 local function ArrayRemove (arr, v)
 	for i, elem in ipairs(arr) do
-		if elem == v then
+		if rawequal(elem, v) then
 			remove(arr, i)
 
 			break
 		end
 	end
-
-	return arr[1]
 end
 
---- Removes an element from _t_&#91;_k_&#93; (treated as an array).
+--- Removes an element from an adaptive array.
 --
--- If either the element or array does not exist, this is a no-op.
--- @ptable t Source table.
+-- If _arr_ is **nil** or _v_ is absent, this is a no-op.
+-- @tparam AdaptiveArray arr
+-- @param v Value to remove.
+-- @treturn AdaptiveArray Updated array.
+function M.RemoveFromArray (arr, v)
+	return AuxRemove(ArrayRemove, arr, v)
+end
+
+--- Variant of @{RemoveFromArray}, with `arr = t[k]`.
+--
+-- If _arr_ is **nil** or _v_ is absent, this is a no-op.
+--
+-- The updated array is stored in _t_&#91;_k_&#93;.
+-- @ptable t Table to update.
 -- @param k Member key.
--- @param v Non-**nil** value to remove.
-function M.RemoveFromArray (t, k, v)
-	t[k] = AuxRemove(ArrayRemove, t[k], v)
+-- @param v Value to remove.
+function M.RemoveFromArray_Member (t, k, v)
+	t[k] = _RemoveFromArray_(t[k], v)
 end
 
 -- Tries to remove a value from a set-type adaptive container
 local function SetRemove (set, v)
-	set[v] = nil
-
-	return next(set)
-end
-
---- Removes an element from _t_&#91;_k_&#93; (treated as a set).
---
--- If either the element or set does not exist, this is a no-op.
--- @ptable t Source table.
--- @param k Member key.
--- @param v Non-**nil** value to remove.
-function M.RemoveFromSet (t, k, v)
-	t[k] = AuxRemove(SetRemove, t[k], v)
-end
-
---[=[
-
-
---
-local function AuxAddToSet (cur, v)
 	if v ~= nil then
-		if cur ~= nil or type(v) == "table" then
-			if type(cur) ~= "table" then
-				cur = cur ~= nil and { [cur] = true } or {}
-			end
-
-			cur[v] = true
-		else
-			return v
-		end
+		set[v] = nil
 	end
-
-	return cur
 end
 
+--- Removes an element from an adaptive set.
 --
-local function AuxAppend (cur, v)
-	if cur ~= nil or type(v) == "table" then
-		if type(cur) ~= "table" then
-			cur = { cur }
-		end
-
-		cur[#cur + 1] = v
-
-		return cur
-	else
-		return v
-	end
-end
-
-local function AuxRemoveFromArray (arr, v)
-	return AuxRemove(ArrayRemove, arr, v)
-end
-
-local function AuxRemoveFromSet (set, v)
+-- If _set_ is **nil** or _v_ is absent, this is a no-op.
+-- @tparam AdaptiveSet set
+-- @param v Value to remove.
+-- @treturn AdaptiveSet Updated set.
+function M.RemoveFromSet (set, v)
 	return AuxRemove(SetRemove, set, v)
 end
 
-do -- empty set
-	local set
-
-	print("ITER EMPTY SET")
-	
-	vdump(set)
-
-	for k, v in M.IterSet(set) do
-		print("IES", k, v)
-	end
-
-	set = AuxAddToSet(set, nil)
-	
-	vdump(set)
-	print("")
+--- Variant of @{RemoveFromSet}, with `set = t[k]`.
+--
+-- If _set_ is **nil** or _v_ is absent, this is a no-op.
+--
+-- The updated set is stored in _t_&#91;_k_&#93;.
+-- @ptable t Table to update.
+-- @param k Member key.
+-- @param v Value to remove.
+function M.RemoveFromSet_Member (t, k, v)
+	t[k] = _RemoveFromSet_(t[k], v)
 end
 
-do -- empty array
-	local arr
-
-	print("ITER EMPTY ARRAY")
-	
-	vdump(arr)
-
-	for i, v in M.IterArray(arr) do
-		print("IEA", i, v)
+-- Simplify body
+local function AuxSimplify (t, first, second)
+	if first == nil then
+		return nil
+	elseif second == nil and type(first) ~= "table" then
+		return first
 	end
 
-	arr = AuxAppend(arr, nil)
-	
-	vdump(arr)
-	print("")
+	return t
 end
 
-do -- one-element set
-	local set
-
-	set = AuxAddToSet(set, "one elem")
-
-	for k, v in M.IterSet(set) do
-		print("Iter 1-Elem. Set", k, v)
-	end
-	
-	vdump(set)
-
-	print("REMOVE?")
-
-	set = AuxRemoveFromSet(set, 338)
-
-	vdump(set)
-
-	print("REMOVE")
-
-	set = AuxRemoveFromSet(set, "one elem")
-
-	vdump(set)
-	print("")
-end
-
-do -- one-element array
-	local arr
-
-	arr = AuxAppend(arr, "DOG")
-
-	for i, v in M.IterArray(arr) do
-		print("Iter 1-Elem. Array", i, v)
+--- If _arr_ is not a table, this is a no-op.
+--
+-- Otherwise, it decays back to a singleton or **nil**, if possible.
+-- @tparam AdaptiveArray arr
+-- @treturn AdaptiveArray Updated array.
+function M.SimplifyArray (arr)
+	if type(arr) == "table" then
+		return AuxSimplify(arr, arr[1], arr[2])
 	end
 
-	vdump(arr)
-
-	print("REMOVE?")
-
-	arr = AuxRemoveFromArray(arr, 338)
-
-	vdump(arr)
-
-	print("REMOVE")
-
-	arr = AuxRemoveFromArray(arr, "DOG")
-
-	vdump(arr)
-	print("")
+	return arr
 end
 
-do -- one (table)-element set
-	local tv, set = {}
-
-	set = AuxAddToSet(set, tv)
-
-	for k, v in M.IterSet(set) do
-		print("Iter 1 Table-Elem. Set", k, v)
-	end
-	
-	vdump(set)
-
-	print("REMOVE?")
-
-	set = AuxRemoveFromSet(set, 338)
-
-	vdump(set)
-
-	print("REMOVE")
-
-	set = AuxRemoveFromSet(set, tv)
-
-	vdump(set)
-	print("")
+--- Variant of @{SimplifyArray}, with `arr = t[k]`.
+--
+-- The updated array is stored in _t_&#91;_k_&#93;.
+-- @ptable t Table to update.
+-- @param k Member key.
+function M.SimplifyArray_Member (t, k)
+	t[k] = _SimplifyArray_(t[k])
 end
 
-do -- one (table)-element array
-	local tv, arr = {}
+--- If _set_ is not a table, this is a no-op.
+--
+-- Otherwise, it decays back to a singleton or **nil**, if possible.
+-- @param set Adaptive set to simplify.
+-- @treturn AdaptiveSet Updated set.
+function M.SimplifySet (set)
+	if type(set) == "table" then
+		local first = next(set)
 
-	arr = AuxAppend(arr, tv)
-
-	for i, v in M.IterArray(arr) do
-		print("Iter 1 Table-Elem. Array", i, v)
+		return AuxSimplify(set, first, next(set, first))
 	end
 
-	vdump(arr)
-
-	print("REMOVE?")
-
-	arr = AuxRemoveFromArray(arr, 338)
-
-	vdump(arr)
-
-	print("REMOVE")
-
-	arr = AuxRemoveFromArray(arr, tv)
-
-	vdump(arr)
-	print("")
+	return set
 end
 
-do -- set: table, then other
-	local set
-
-	set = AuxAddToSet(set, {})
-	set = AuxAddToSet(set, "one elem")
-
-	for k, v in M.IterSet(set) do
-		print("Iter 2-Elem. Set (table, then other)", k, v)
-	end
-	
-	vdump(set)
-	print("")
+--- Variant of @{SimplifySet}, with `set = t[k]`.
+--
+-- The updated set is stored in _t_&#91;_k_&#93;.
+-- @ptable t Table to update.
+-- @param k Member key.
+function M.SimplifySet_Member (t, k)
+	t[k] = _SimplifySet_(t[k])
 end
 
-do -- array: table, then other
-	local arr
-
-	arr = AuxAppend(arr, {})
-	arr = AuxAppend(arr, "DOG")
-
-	for i, v in M.IterArray(arr) do
-		print("Iter 2-Elem. Array (table, then other)", i, v)
-	end
-
-	vdump(arr)
-	print("")
-end
-
-do -- set: other, then table
-	local set
-
-	set = AuxAddToSet(set, "one elem")
-	set = AuxAddToSet(set, {})
-
-	for k, v in M.IterSet(set) do
-		print("Iter 2-Elem. Set (other, then table)", k, v)
-	end
-	
-	vdump(set)
-	print("")
-end
-
-do -- array: other, then table
-	local arr
-
-	arr = AuxAppend(arr, "DOG")
-	arr = AuxAppend(arr, {})
-
-	for i, v in M.IterArray(arr) do
-		print("Iter 2-Elem. Array (other, then table)", i, v)
-	end
-
-	vdump(arr)
-	print("")
-end
---]=]
+-- Cache module members.
+_AddToSet_ = M.AddToSet
+_Append_ = M.Append
+_RemoveFromArray_ = M.RemoveFromArray
+_RemoveFromSet_ = M.RemoveFromSet
+_SimplifyArray_ = M.SimplifyArray
+_SimplifySet_ = M.SimplifySet
 
 -- Export the module.
 return M
