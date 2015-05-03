@@ -236,17 +236,12 @@ end
 -- @string osub Name of other element's sublink.
 -- @ptable events Valid events. 
 -- @ptable actions Valid actions.
--- @string[opt] akey Key under which the actions set is stored, in _elem_. If absent, the set
--- will be created on demand.
+-- @string akey Key under which the actions set is stored, in _elem_.
 function M.LinkActionsAndEvents (elem, other, esub, osub, events, actions, akey)
 	if events[esub] then
 		_AddId_(elem, esub, other.uid, osub)
 	elseif actions[esub] then
-		local eactions = elem[akey] or {}
-
-		eactions[esub] = true
-
-		elem[akey] = eactions
+		adaptive.AddToSet_Member(elem, akey, esub)
 	end
 end
 
