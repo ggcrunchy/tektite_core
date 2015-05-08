@@ -46,6 +46,15 @@ local RotateIndex = index_funcs.RotateIndex
 -- Exports --
 local M = {}
 
+--
+local function NextID (id, n, arr)
+	if n then
+		return RotateIndex(id, n == "size" and #arr or n)
+	else
+		return id + 1
+	end
+end
+
 -- Helper to kick off a new generation
 local function AuxBeginGeneration (arr, key, n)
 	-- Update the master ID for the current generation and overwrite one slot with an invalid
@@ -62,7 +71,7 @@ local function AuxBeginGeneration (arr, key, n)
 	-- That said, if this is stock Lua or LuaJIT, say, where numbers are still doubles (or in
 	-- 5.3+, where integers are still 64-bit), much of this is a formality, given how very
 	-- long it would take to increment these to overflow.
-	local gen_id = RotateIndex(arr[key] or 0, n or #arr)
+	local gen_id = NextID(arr[key] or 0, n, arr)
 
 	arr[key], arr[-(gen_id + 1)] = gen_id
 end
@@ -183,7 +192,7 @@ function M.Wrap (arr, n)
 
 		-- Begin Generation --
 		elseif what == "begin_generation" then
-			gen_id = RotateIndex(gen_id, n or #arr) -- see the comment in AuxBeginGeneration()
+			gen_id = NextID(gen_id, n, arr) -- see the comment in AuxBeginGeneration()
 
 			arr[-(gen_id + 1)] = nil
 
