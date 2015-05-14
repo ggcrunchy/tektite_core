@@ -136,7 +136,7 @@ function M.BroadcastBuilder_Helper (name, what)
 
 	local builder, broadcast_helper = _BroadcastBuilder_(what), {}
 
-	--- Calls _object_'s broadcast function, i.e. performs `object&#91;what&#93;(...)`.
+	--- Calls _object_'s broadcast function, i.e. performs `object[what](...)`.
 	--
 	-- If the function absent, this is a no-op.
 	-- @param object Object in which the broadcast function is stored.
