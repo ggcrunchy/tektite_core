@@ -1,4 +1,6 @@
 --- Some utilities for dealing with sampled functions.
+--
+-- TODO: **Param**, **Value**, **SampleSet**
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -89,7 +91,7 @@ local function AuxLookup (samples, x, start)
 end
 
 --- DOCME
--- @tparam Samples samples
+-- @tparam SampleSet samples
 -- @tparam Param x
 -- @tparam Value y
 -- @param[opt] data
@@ -107,33 +109,34 @@ function M.AddEntry (samples, x, y, data)
 		else
 			local bin, frac = AuxLookup(samples, x)
 
-			-- Matches left side --
+			-- Matches left side...
 			if frac == 0 then
 				entry = samples[bin]
 
-			-- Matches right side --
+			-- ...or right side...
 			elseif bin == n - 1 and frac == 1 then
 				entry = samples[bin + 1]
 
-			-- Within interval --
+			-- ...otherwise, within interval.
 			else
 				at = bin + 1
 			end
 		end
 
-		--
+		-- If a new entry is being added, try to recycle an old one. In any case, insert it.
 		if at then
 			entry = remove(samples, n + 1) or {}
 
 			insert(samples, at, entry)
 		end
 
+		-- Assign the fields. Postponing this until now simplifies some lookups above.
 		entry.x, entry.y, entry.data = x, y, data
 	end
 end
 
 --- DOCME
--- @tparam Samples samples
+-- @tparam SampleSet samples
 -- @tparam Param x
 -- @tparam Value y
 -- @param[opt] data
@@ -148,10 +151,14 @@ function M.Append (samples, x, y, data)
 	samples[n + 1], samples.n = entry, n + 1
 end
 
---- DOCME
--- @tparam ?|table|Samples
-function M.Init (samples)
-	samples.n = 0
+--- Prepares a table for use by the rest of the routines in this module.
+--
+-- This may also be used to reset an already initialized samples set.
+-- @tparam ?|table|SampleSet samples Sample set to initialize.
+-- @param mode Sets the interpolation mode used by @{Lookup_01}. If absent, uses the default. 
+-- @treturn SampleSet samples.
+function M.Init (samples, mode)
+	samples.n, samples.mode = 0, mode
 
 	return samples
 end
@@ -163,9 +170,24 @@ local function FindBin (samples, x, start)
 	return i, frac, oob and (frac == 0 and "<" or ">"), samples[i], i < samples.n and samples[i + 1] -- account for one-sample case
 end
 
---- Resolves a parameter to a p.
--- @bool add_01_wrapper Return wrapper function?
--- @array[opt] lut The underlying lookup table. If absent, a table is supplied.
+--
+local function GetFraction (x, entry, next)
+	local x1 = entry.x
+
+	return next and (x - x1) / (next.x - x1) or 0
+end
+
+--- Resolves a parameter to a pair of samples.
+-- @tparam SampleSet samples Sample set to search.
+-- @ptable result A parameter is resolved to two consecutive samples _s1_ and _s2_ (when only
+-- one sample is available, it is duplicated). This table is populated from these.
+--
+-- Fields **x**, **y**, and **data** (which may be **nil**) from _s1_ are assigned to
+-- _result_'s **x1**, **y1**, and **data1** fields. The same fields from _s2_ are likewise
+-- assigned to **x2**, **y2**, and **data2**.
+-- @tparam Param x Parameter to resolve.
+-- @int[opt] start If provided, the index of a sample / bin. If possible, search begins at
+-- this position. This might improve search speed if the correct bin is nearby.
 --
 -- In a well-formed, populated table, each element  will have **number** members **s** and
 -- **t**. In the first element, both values will be 0. In the final elemnt, **t** will be
@@ -185,16 +207,6 @@ end
 -- @treturn array _lut_.
 -- @treturn ?function If _add\_01\_wrapper_ is true, this is a function that behaves like the
 -- lookup function, except the input range is scaled to [0, 1].
-
-
---
-local function GetFraction (x, entry, next)
-	local x1 = entry.x
-
-	return next and (x - x1) / (next.x - x1) or 0
-end
-
---- DOCME
 function M.Lookup (samples, result, x, start)
 	local bin, frac, oob, entry, next = FindBin(samples, x, start)
 
@@ -208,14 +220,34 @@ function M.Lookup (samples, result, x, start)
 end
 
 --- DOCME
+-- @tparam SampleSet samples Sample set to search.
+-- @ptable result As per @{Lookup}.
+-- @tparam Param x As per @{Lookup}, but the parameter space is remapped to [0, 1]. In
+-- particular, an _x_ of 0 or 1 corresponds to the first or last sample, respectively.
+--
+-- The **x1** and **x2** in _result_ will have their regular values.
+--
+-- Values are remapped with a linear interpolation as `x = first + (last - first) * x`, where
+-- _first_ and _last_ are the **x** values in the first and last sample. If some of these are
+-- not **number** values, appropriate **__add**, **__mul**, and **__sub** metamethods must
+-- be defined.
+-- @int[opt] start As per @{Lookup}.
 function M.Lookup_01 (samples, result, x, start)
 	local last = samples[samples.n]
 
-	_Lookup_(samples, result, last and x * last.x, start) -- if samples are empty, assert will fire off
+	if last then -- If samples are empty, defer assert to lookup step
+		local x1 = samples[1].x
+
+		x = x1 + (last.x - x1) * x
+
+		-- TODO: x1 * (1 - x) + last.x * x avoids the __sub metamethod, e.g. if x is usually a scalar
+	end
+
+	_Lookup_(samples, result, x, start) 
 end
 
 --- DOCME
--- @tparam Samples samples
+-- @tparam SampleSet samples
 -- @uint index
 -- @tparam Param x
 -- @tparam Value y
@@ -236,7 +268,7 @@ function M.SetEntry (samples, index, x, y, data)
 end
 
 --- DOCME
--- @tparam Samples samples
+-- @tparam SampleSet samples
 -- @tparam Param x
 -- @int[opt] start
 -- @treturn ?|uint|boolean BIN
@@ -252,7 +284,7 @@ function M.ToBin (samples, x, start)
 end
 
 --- DOCME
--- @tparam Samples samples
+-- @tparam SampleSet samples
 -- @tparam Param x
 -- @int[opt] start
 -- @treturn uint BIN
