@@ -1,6 +1,14 @@
 --- Some utilities for dealing with sampled functions.
 --
--- TODO: **Param**, **Value**, **SampleSet**
+-- Any such function is stored as a discrete set of samples, termed **SampleSet** in this
+-- module. Each sample has **x** and **y** fields, with **x** being the parameter at which
+-- the function was sampled and **y** its result.
+--
+-- Samples are ordered by increasing **x**. Any parameters not of **number** type must
+-- therefore define **__lt** (and possibly **__le**) metamethods. Sample lookup similarly
+-- introduces the need for arithmetic metamethods, q.v. @{Lookup} and @{Lookup_01}.
+--
+-- Apart from storing and retrieving them, the module ignores the **y** values.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -35,17 +43,14 @@ local remove = table.remove
 local range = require("tektite_core.number.range")
 
 -- Cached module references --
-local _Append_
-local _Init_
+local _GetCount_
 local _Lookup_
 
 -- Exports --
 local M = {}
 
---
-local function AuxLookup (samples, x, start)
-	local n = samples.n
-
+-- Find the first sample corresponding to a parameter
+local function AuxLookup (samples, n, x, start) -- n as argument to unify streamline the initialization assert
 	assert(n > 0, "Empty sample set")
 
 	-- Too-low x, or single sample: clamp to first sample.
@@ -90,87 +95,84 @@ local function AuxLookup (samples, x, start)
 	end
 end
 
---- DOCME
+--- Adds a new sample to the set, if _x_ is new; otherwise, updates its corresponding sample.
 -- @tparam SampleSet samples
--- @tparam Param x
--- @tparam Value y
--- @param[opt] data
--- @treturn uint INDEX
-function M.AddEntry (samples, x, y, data)
-	local n = assert(samples.n, "Uninitialized sampling state")
-
-	if n == 0 or x > samples[n].x then
-		_Append_(samples, x, y, data)
-	else
-		local entry, at
-
-		if x < samples[1].x then
-			at = 1
-		else
-			local bin, frac = AuxLookup(samples, x)
-
-			-- Matches left side...
-			if frac == 0 then
-				entry = samples[bin]
-
-			-- ...or right side...
-			elseif bin == n - 1 and frac == 1 then
-				entry = samples[bin + 1]
-
-			-- ...otherwise, within interval.
-			else
-				at = bin + 1
-			end
-		end
-
-		-- If a new entry is being added, try to recycle an old one. In any case, insert it.
-		if at then
-			entry = remove(samples, n + 1) or {}
-
-			insert(samples, at, entry)
-		end
-
-		-- Assign the fields. Postponing this until now simplifies some lookups above.
-		entry.x, entry.y, entry.data = x, y, data
-	end
-end
-
---- DOCME
--- @tparam SampleSet samples
--- @tparam Param x
--- @tparam Value y
--- @param[opt] data
-function M.Append (samples, x, y, data)
-	local n = assert(samples.n, "Uninitialized sampling state")
-	local entry = samples[n + 1] or {}
-
-	assert(n == 0 or x > samples[n].x, "x <= previous sample's x")
-
-	entry.x, entry.y, entry.data = x, y, data
-
-	samples[n + 1], samples.n = entry, n + 1
-end
-
---- Prepares a table for use by the rest of the routines in this module.
+-- @tparam Param x Parameter to assign.
 --
--- This may also be used to reset an already initialized samples set.
--- @tparam ?|table|SampleSet samples Sample set to initialize.
--- @param mode Sets the interpolation mode used by @{Lookup_01}. If absent, uses the default. 
--- @treturn SampleSet samples.
-function M.Init (samples, mode)
-	samples.n, samples.mode = 0, mode
+-- If this is not of type **number**, note that an **__eq** metamethod is not necessary to
+-- establish _x_'s uniqueness.
+-- @param y Value to assign.
+-- @int[opt] start As per @{Lookup}.
+function M.AddSample (samples, x, y, start)
+	local n, entry, at = _GetCount_(samples)
+
+	-- Append...
+	if n == 0 or x > samples[n].x then
+		at = n + 1
+
+	-- ...prepend...
+	elseif x < samples[1].x then
+		at = 1
+
+	-- ...otherwise, insert or update inside the set.
+	else
+		local bin, frac = AuxLookup(samples, n, x, start)
+
+		-- Matches left side...
+		if frac == 0 then
+			entry = samples[bin]
+
+		-- ...or right side...
+		elseif bin == n - 1 and frac == 1 then
+			entry = samples[bin + 1]
+
+		-- ...otherwise, within bin.
+		else
+			at = bin + 1
+		end
+	end
+
+	-- If a new entry is being added, try to recycle an old one. In any case, insert it.
+	if at then
+		entry, samples.n = remove(samples, n + 1) or {}, n + 1
+
+		insert(samples, at, entry)
+	end
+
+	-- Assign the fields. Postponing this until now simplifies some lookups above.
+	entry.x, entry.y = x, y
+end
+
+--- Accessor.
+-- @tparam SampleSet samples
+-- @treturn uint Sample count.
+function M.GetCount (samples)
+	return assert(samples.n, "Uninitialized sampling state")
+end
+
+--- Prepares a table for use by the rest of the routines in this module, i.e. afterward
+-- _samples_ will be a valid **SampleSet**.
+--
+-- If _samples_ is already a **SampleSet**, it will be reset.
+-- @tparam[opt] ?|table|SampleSet samples Set to prepare. If absent, a table is created.
+-- @treturn SampleSet _samples_.
+function M.Init (samples)
+	samples = samples or {}
+
+	samples.n = 0
 
 	return samples
 end
 
---
+-- Given a parameter, gather information about the bin comprising its corresponding samples
 local function FindBin (samples, x, start)
-	local i, frac, oob = AuxLookup(samples, x, start)
+	local n = _GetCount_(samples)
+	local i, frac, oob = AuxLookup(samples, n, x, start)
 
-	return i, frac, oob and (frac == 0 and "<" or ">"), samples[i], i < samples.n and samples[i + 1] -- account for one-sample case
+	return i, frac, oob and (frac == 0 and "<" or ">"), samples[i], i < n and samples[i + 1] -- account for one-sample case
 end
 
---
+-- Find where a parameter lies within a bin
 local function GetFraction (x, entry, next)
 	local x1 = entry.x
 
@@ -180,33 +182,23 @@ end
 --- Resolves a parameter to a pair of samples.
 -- @tparam SampleSet samples Sample set to search.
 -- @ptable result A parameter is resolved to two consecutive samples _s1_ and _s2_ (when only
--- one sample is available, it is duplicated). This table is populated from these.
+-- one sample is available, it is duplicated). These are used to populate the table.
 --
--- Fields **x**, **y**, and **data** (which may be **nil**) from _s1_ are assigned to
--- _result_'s **x1**, **y1**, and **data1** fields. The same fields from _s2_ are likewise
--- assigned to **x2**, **y2**, and **data2**.
+-- Fields **x** and **y** from _s1_ are assigned to _result_'s **x1** and **y1** fields;
+-- **x2** and **y2** are similarly populated from _s2_.
+--
+-- The **bin** field is set to the sample pair's index. For instance, bin #_i_ corresponds
+-- to samples #_i_ and #_i_ + 1; a set with _n_ samples has _n_ - 1 bins. The **frac** field,
+-- meanwhile, is a number &isin; [0, 1], describing _x_'s relative position in the bin.
+-- It is computed as `(x - s1.x) / (s2.x - s1.x)`.
+--
+-- If _x_ is less than the first sample's **x**, **bin** and **frac** are clamped to 1 and 0,
+-- respectively. If _x_ is greater than the last sample's **x**, they are clamped to _n_ - 1
+-- and 1, respectively. In the first case, the **out\_of\_bounds** field is set to **"<"**,
+-- in the second to **">"**, and otherwise **false**.
 -- @tparam Param x Parameter to resolve.
 -- @int[opt] start If provided, the index of a sample / bin. If possible, search begins at
 -- this position. This might improve search speed if the correct bin is nearby.
---
--- In a well-formed, populated table, each element  will have **number** members **s** and
--- **t**. In the first element, both values will be 0. In the final elemnt, **t** will be
--- 1. In element _lut[i + 1]_, **s** and **t** must each be larger than the respective
--- members in element _lut[i]_.
--- @treturn function Lookup function, called as
---    t1, t2, index, u, s1, s2 = func(s, start)
--- where _s_ is the arc length to search and _start_ is an (optional) index where the search
--- may be started (when performing multiple "nearby" lookups, this might speed up search).
---
--- _t1_ and _t2_ are the t parameter bounds of the interval, _s1_ and _s2_ are the arc length
--- bounds of the same, _index_ is the interval index (e.g. for passing again as _start_), and
--- _u_ is an interpolation factor &isin; [0, 1], which may be used to approximate _t_, given
--- _t1_ and _t2_.
---
--- The arc length is clamped to [0, _s_), _s_ being the final **s** in the lookup table.
--- @treturn array _lut_.
--- @treturn ?function If _add\_01\_wrapper_ is true, this is a function that behaves like the
--- lookup function, except the input range is scaled to [0, 1].
 function M.Lookup (samples, result, x, start)
 	local bin, frac, oob, entry, next = FindBin(samples, x, start)
 
@@ -215,11 +207,11 @@ function M.Lookup (samples, result, x, start)
 
 	next = next or entry -- account for one-sample case
 
-	result.x1, result.y1, result.data1 = entry.x, entry.y, entry.data
-	result.x2, result.y2, result.data2 = next.x, next.y, next.data
+	result.x1, result.y1 = entry.x, entry.y
+	result.x2, result.y2 = next.x, next.y
 end
 
---- DOCME
+--- Variant of @{Lookup} parametrized over a unit interval.
 -- @tparam SampleSet samples Sample set to search.
 -- @ptable result As per @{Lookup}.
 -- @tparam Param x As per @{Lookup}, but the parameter space is remapped to [0, 1]. In
@@ -227,52 +219,29 @@ end
 --
 -- The **x1** and **x2** in _result_ will have their regular values.
 --
--- Values are remapped with a linear interpolation as `x = first + (last - first) * x`, where
--- _first_ and _last_ are the **x** values in the first and last sample. If some of these are
--- not **number** values, appropriate **__add**, **__mul**, and **__sub** metamethods must
--- be defined.
+-- Values are remapped as `x = first + (last - first) * x`, where _first_ and _last_ are the
+-- **x** values in the first and last sample.
 -- @int[opt] start As per @{Lookup}.
 function M.Lookup_01 (samples, result, x, start)
-	local last = samples[samples.n]
+	local last = samples[_GetCount_(samples)]
 
 	if last then -- If samples are empty, defer assert to lookup step
 		local x1 = samples[1].x
 
 		x = x1 + (last.x - x1) * x
-
-		-- TODO: x1 * (1 - x) + last.x * x avoids the __sub metamethod, e.g. if x is usually a scalar
 	end
 
 	_Lookup_(samples, result, x, start) 
 end
 
---- DOCME
--- @tparam SampleSet samples
--- @uint index
--- @tparam Param x
--- @tparam Value y
--- @param[opt] data
-function M.SetEntry (samples, index, x, y, data)
-	local n = assert(samples.n, "Uninitialized sampling state")
-
-	if index == n + 1 then
-		_Append_(samples, x, y, data)
-	else
-		local entry = assert(index <= n and samples[index], "Invalid entry")
-
-		assert(index == 1 or x > samples[1].x, "x <= previous sample's x")
-		assert(index == n or x < samples[index + 1].x, "x >= next sample's x")
-
-		entry.x, entry.y, entry.data = x, y, data
-	end
-end
-
---- DOCME
--- @tparam SampleSet samples
--- @tparam Param x
--- @int[opt] start
--- @treturn ?|uint|boolean BIN
--- @treturn ?number FRAC
+--- Finds the samples parametrized by _x_, failing if _x_ is out-of-bounds.
+-- @tparam SampleSet samples Sample set to search.
+-- @tparam Param x Parameter to resolve.
+-- @int[opt] start As per @{Lookup}.
+-- @treturn ?|uint|boolean If _x_ was out-of-bounds, **false**. Otherwise, the index _i_ of
+-- the bin belonging to samples #_i_ and #_i_ + 1.
+-- @treturn ?number If _x_ was within bounds, its relative position in its bin, as per
+-- _result_'s **frac** field in @{Lookup}.
 function M.ToBin (samples, x, start)
 	local i, frac, oob, entry, next = FindBin(samples, x, start)
 
@@ -283,22 +252,49 @@ function M.ToBin (samples, x, start)
 	end
 end
 
---- DOCME
--- @tparam SampleSet samples
--- @tparam Param x
--- @int[opt] start
--- @treturn uint BIN
--- @treturn number FRAC
--- @treturn ?|string|boolean OOB
+--- Variant of @{ToBin} that clamps out-of-bounds parameters.
+--
+-- In effect, this is a more minimalist version of @{Lookup}.
+-- @tparam SampleSet samples Sample set to search.
+-- @tparam Param x Parameter to resolve.
+-- @int[opt] start As per @{Lookup}.
+-- @treturn uint As per _result_'s **bin** field, in @{Lookup}...
+-- @treturn number ...and **frac**...
+-- @treturn ?|string|boolean ...and **out\_of\_bounds**.
 function M.ToBin_Clamped (samples, x, start)
 	local i, frac, oob, entry, next = FindBin(samples, x, start)
 
 	return i, frac or GetFraction(x, entry, next), oob
 end
 
+--- Updates the **x** and **y** values of an existing sample.
+-- @tparam SampleSet samples
+-- @uint index Sample index, &isin; [1, _n_], where _n_ is the sample count, cf. @{GetCount}.
+-- @tparam Param x Parameter to assign.
+--
+-- A sample can be updated if `samples[index - 1].x < x and x < samples[index + 1].x` is
+-- true. In this context, _samples_[0] and _samples_[_n_ + 1] can be interpreted to have
+-- values -&inf; and +&inf;, respectively.
+-- @param y Value to assign.
+-- @treturn boolean Could the sample be updated?
+-- @treturn ?Param If the sample was updated, its previous **x** value...
+-- @return ...and **y** value.
+-- @see AddSample
+function M.UpdateSample (samples, index, x, y)
+	local n = _GetCount_(samples)
+	local entry = index <= n and samples[index]
+
+	if entry and (index == 1 or x > samples[index - 1].x) and (index == n or x < samples[index + 1].x) then
+		entry.x, entry.y, x, y = x, y, entry.x, entry.y
+
+		return true, x, y
+	else
+		return false
+	end
+end
+
 -- Cache module members.
-_Append_ = M.Append
-_Init_ = M.Init
+_GetCount_ = M.GetCount
 _Lookup_ = M.Lookup
 
 -- Export the module.
