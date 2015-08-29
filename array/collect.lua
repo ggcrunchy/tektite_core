@@ -32,6 +32,32 @@ local unpack = unpack
 -- Exports --
 local M = {}
 
+-- A standard append, based on Collect's analysis.
+local function Append (acc, i, count, v1, v2, v3, v4, v5, ...)
+	if i <= count then
+		acc[#acc + 1] = v1
+		acc[#acc + 1] = v2
+		acc[#acc + 1] = v3
+		acc[#acc + 1] = v4
+		acc[#acc + 1] = v5
+
+		return Append(acc, i + 5, count, ...)
+	end
+
+	return acc
+end
+
+--- Appends arguments into an object, as `acc[#acc + 1] = arg`.
+-- @param[opt] acc Accumulator object; if absent, a table is supplied.
+-- @param ... Arguments to append.
+-- @treturn uint Argument count.
+-- @return Filled accumulator.
+function M.AppendArgs (acc, ...)
+	local count = select("#", ...)
+
+	return count, Append(acc or {}, 0, count, ...)
+end
+
 -- This is a standard collect, specialized for five element loads at once, which seems to
 -- be a reasonable sweet spot in tests.
 local function Collect (acc, i, count, v1, v2, v3, v4, v5, ...)
