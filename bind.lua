@@ -181,9 +181,9 @@ local function AuxEvent (event, index)
 	end
 end
 
---- Convenience routine for iterating the component events that comprise a broadcast (i.e.
--- a compound event built up by some variant of @{BroadcastBuilder}), e.g. for when some
--- operation must be performed between each one.
+--- Convenience routine for iterating the component events that make up a broadcast (i.e. a
+-- compound event built up by some variant of @{BroadcastBuilder}), e.g. when some operation
+-- must be performed between each one.
 --
 -- This accounts for absent, single, and compound events.
 --

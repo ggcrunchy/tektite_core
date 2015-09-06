@@ -56,7 +56,7 @@ function M.InUse (arr, index)
 	-- cases as though a number was found in the array part.
 	local elem = index > 0 and arr[index] or 0
 
-	-- The stack is comprised of numbers; conversely, non-numbers are in use.
+	-- The queue consists of numbers; conversely, non-numbers are in use.
 	return type(elem) ~= "number"
 end
 
@@ -72,9 +72,9 @@ function M.RemoveAt (arr, index, free)
 	if index == n then
 		n, arr[index] = n - 1
 
-		-- It may be possible to trim more: if the new final slot also happens to be
-		-- the free stack top, it is known to not be in use. Trim the array until this
-		-- is no longer the case (which may mean the free stack is empty).
+		-- It may be possible to trim more: if the new final slot also happens to be the
+		-- head of the free list, it is known to not be in use. Trim the array until this
+		-- is no longer the case (which could mean the free list is empty).
 		while n > 0 and n == free do
 			free, n, arr[n] = arr[n], n - 1
 		end
