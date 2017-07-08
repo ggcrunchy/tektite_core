@@ -41,6 +41,7 @@ local lazy = require("tektite_core.table.lazy")
 local _AddId_
 local _BroadcastBuilder_
 local _IterEvents_
+local _Reset_
 local _Subscribe_
 
 -- Exports --
@@ -290,7 +291,7 @@ function M.Resolve (name)
 		func(dt[id], arg)
 	end
 
-	M.Reset(name)
+	_Reset_(name)
 end
 
 --- Subscribes to 0 or more events. This is intended as a startup process that associates
@@ -323,6 +324,7 @@ end
 _AddId_ = M.AddId
 _BroadcastBuilder_ = M.BroadcastBuilder
 _IterEvents_ = M.IterEvents
+_Reset_ = M.Reset
 _Subscribe_ = M.Subscribe
 
 -- Export the module.
