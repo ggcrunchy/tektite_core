@@ -27,6 +27,7 @@
 local find = string.find
 local format = string.format
 local ipairs = ipairs
+local pairs = pairs
 local rawget = rawget
 local setmetatable = setmetatable
 local sub = string.sub
@@ -243,6 +244,41 @@ function M.LinkActionsAndEvents (elem, other, esub, osub, events, actions, akey)
 		_AddId_(elem, esub, other.uid, osub)
 	elseif actions[esub] then
 		adaptive.AddToSet_Member(elem, akey, esub)
+	end
+end
+
+--- Extends @{LinkActionsAndEvents}, so that if either the action or event is missing
+-- a property is tried instead.
+--
+-- If _esub_ is then present in _props_, the member under _esub_ in the property set will be
+-- set to **true** / present (these will be adapative sets analogous in shape to _props_).
+-- @ptable elem Element.
+-- @ptable other Other element.
+-- @string esub Name of element's sublink.
+-- @string osub Name of other element's sublink.
+-- @ptable events Valid events. 
+-- @ptable actions Valid actions.
+-- @string akey Key under which the actions set is stored, in _elem_.
+-- @ptable props Valid properties, with per-type subtables.
+-- @string pkey Key under which the properties set is stored, in _elem_.
+function M.LinkActionsEventsAndProperties (elem, other, esub, osub, events, actions, akey, props, pkey)
+	if events[esub] then
+		_AddId_(elem, esub, other.uid, osub)
+	elseif actions[esub] then
+		adaptive.AddToSet_Member(elem, akey, esub)
+	else
+		local pset = elem[pkey]
+
+		for k, pgroup in pairs(props) do
+			if pgroup[esub] then
+				pset = pset or {}
+				pset[k] = adaptive.AddToSet(pset[k], esub)
+
+				break
+			end
+		end
+
+		elem[pkey] = pset
 	end
 end
 
