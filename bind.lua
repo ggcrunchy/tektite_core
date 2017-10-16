@@ -163,8 +163,9 @@ function M.BroadcastBuilder_Helper (name, what)
 	-- with _builder_ as per @{BroadcastBuilder}.
 	-- @param object Object to query for broadcast function.
 	-- @tparam ?|string|array|nil id As per @{Subscribe}.
-	function broadcast_helper.Subscribe (object, id)
-		_Subscribe_(name, id, builder, object)
+	-- @string? wname If provided, use the named waiting list.
+	function broadcast_helper.Subscribe (object, id, wname)
+		_Subscribe_(wname or name, id, builder, object)
 	end
 
 	-- Hook up a metatable for __call and supply the helper. Add the key in case the user
