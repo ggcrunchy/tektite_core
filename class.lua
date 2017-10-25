@@ -222,8 +222,9 @@ do
 	--
 	-- A **__clone** entry will be installed as the clone body, which is an error otherwise.
 	-- This should be callable as
-	--    clone(I, ...),
-	-- where _I_ is the instance to clone and _..._ are any arguments passed to @{Clone}.
+	--    clone(CI, I, ...),
+	-- where _CI_ is the new instance, _I_ is the instance to clone and _..._ are any
+	-- arguments passed to @{Clone}.
 	-- @tparam ?|table|nil params Configuration parameters table, or **nil** to use the defaults.
 	--
 	-- If the **base** key is present, its value should be a class type previously returned
