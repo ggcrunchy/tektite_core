@@ -37,6 +37,7 @@ local type = type
 -- Modules --
 local adaptive = require("tektite_core.table.adaptive")
 local lazy = require("tektite_core.table.lazy")
+local table_funcs = require("tektite_core.table.funcs")
 
 -- Cached module references --
 local _AddId_
@@ -71,7 +72,6 @@ end
 
 --- Convenience routine for building a subscribe function that in turn will populate a
 -- broadcast-type event sender, i.e. one that may send 0, 1, or multiple events.
--- @param what Key under which the broadcast function is stored, in _object_.
 -- @treturn function Builder, called as
 --    builder(event, object)
 -- where _event_ is a published event, cf. @{Publish}.
@@ -92,20 +92,21 @@ end
 --
 -- It is intended that _builder_ be passed as the _func_ argument to @{Subscribe}, with
 -- _object_ passed alongside it as _arg_.
-function M.BroadcastBuilder (what)
-	local list
+-- @treturn table Weak table associating objects to broadcasters, mainly for internal use.
+function M.BroadcastBuilder ()
+	local object_to_broadcaster, list = table_funcs.Weak("k")
 
 	return function(func, object)
 		-- If events already exist, add this event to the list. If this
 		-- is only the second event thus far, begin constructing the list
 		-- (moving the first event into it) and the compound function.
-		local curf = object[what]
+		local curf = object_to_broadcaster[object]
 
 		if curf then
 			if not list then
 				list = { curf }
 
-				object[what] = function(arg1, arg2, ...)
+				object_to_broadcaster[object] = function(arg1, arg2, ...)
 					if arg1 == "n" then
 						return #list
 					elseif arg1 == "i" then
@@ -122,21 +123,17 @@ function M.BroadcastBuilder (what)
 
 		-- No events yet: add the first one.
 		else
-			object[what] = func
+			object_to_broadcaster[object] = func
 		end
-	end
+	end, object_to_broadcaster
 end
 
 --- Variant of @{BroadcastBuilder} that supplies a helper object to facilitate certain
 -- common broadcast use cases.
 -- @param name Name of waiting list.
--- @param[opt] what As per @{BroadcastBuilder}. If absent, a default is generated.
 -- @treturn broadcast_helper Object with some useful functions.
--- @return _what_.
-function M.BroadcastBuilder_Helper (name, what)
-	what = what or {}
-
-	local builder, broadcast_helper = _BroadcastBuilder_(what), {}
+function M.BroadcastBuilder_Helper (name)
+	local broadcast_helper, builder, object_to_broadcaster = {}, _BroadcastBuilder_()
 
 	--- Calls _object_'s broadcast function, i.e. performs `object[what](...)`.
 	--
@@ -144,7 +141,7 @@ function M.BroadcastBuilder_Helper (name, what)
 	-- @param object Object in which the broadcast function is stored.
 	-- @param ... Arguments.
 	function broadcast_helper:__call (object, ...)
-		local func = object[what]
+		local func = object_to_broadcaster[object]
 
 		if func then
 			func(...)
@@ -156,7 +153,7 @@ function M.BroadcastBuilder_Helper (name, what)
 	-- @param object Object in which the broadcast function is stored.
 	-- @treturn iterator As per @{IterEvents}.
 	function broadcast_helper.Iter (object)
-		return _IterEvents_(object[what])
+		return _IterEvents_(object_to_broadcaster[object])
 	end
 
 	--- Subscribes _object_ to events, i.e. performs `Subscribe(name, id, builder, object)`,
@@ -172,7 +169,7 @@ function M.BroadcastBuilder_Helper (name, what)
 	-- does end up needing it (for the auto-generated case, mostly).
 	setmetatable(broadcast_helper, broadcast_helper)
 
-	return broadcast_helper, what
+	return broadcast_helper
 end
 
 -- Event iterator body
