@@ -92,7 +92,7 @@ end
 --
 -- It is intended that _builder_ be passed as the _func_ argument to @{Subscribe}, with
 -- _object_ passed alongside it as _arg_.
--- @treturn table Weak table associating objects to broadcasters, mainly for internal use.
+-- @treturn table Weak table associating objects to broadcasters.
 function M.BroadcastBuilder ()
 	local object_to_broadcaster, list = table_funcs.Weak("k")
 
@@ -135,7 +135,7 @@ end
 function M.BroadcastBuilder_Helper (name)
 	local broadcast_helper, builder, object_to_broadcaster = {}, _BroadcastBuilder_()
 
-	--- Calls _object_'s broadcast function, i.e. performs `object[what](...)`.
+	--- Calls _object_'s broadcast function, i.e. performs `object_to_broadcaster[object](...)`.
 	--
 	-- If the function absent, this is a no-op.
 	-- @param object Object in which the broadcast function is stored.
@@ -148,7 +148,7 @@ function M.BroadcastBuilder_Helper (name)
 		end
 	end
 
-	--- Iterates _object_'s broadcast function, i.e. performs `IterEvents(object[what])`.
+	--- Iterates _object_'s broadcast function, i.e. performs `IterEvents(object_to_broadcaster[object])`.
 	--
 	-- @param object Object in which the broadcast function is stored.
 	-- @treturn iterator As per @{IterEvents}.
@@ -189,9 +189,9 @@ end
 --
 -- **N.B.** In the single event case, if called with **"n"** as its first argument, _event_
 -- is expected to be a no-op.
--- @callable[opt] event The compound event stored under the _what_ key in the object performing
--- the broadcast, cf. @{BroadcastBuilder}. If **nil** (interpreted as the object in question
--- not having subscribed to the event), this is a no-op.
+-- @callable[opt] event The compound event stored mapped to the broadcasting object, cf.
+-- @{BroadcastBuilder}. If **nil** (interpreted as said object not being subscribed to the
+-- event), this is a no-op.
 -- @treturn iterator Supplies index, event.
 function M.IterEvents (event)
 	return AuxEvent, event, event and event("n")
@@ -237,12 +237,17 @@ end
 -- @ptable events Valid events. 
 -- @ptable actions Valid actions.
 -- @string akey Key under which the actions set is stored, in _elem_.
+-- @treturn boolean An action was performed?
 function M.LinkActionsAndEvents (elem, other, esub, osub, events, actions, akey)
 	if events[esub] then
 		_AddId_(elem, esub, other.uid, osub)
 	elseif actions[esub] then
 		adaptive.AddToSet_Member(elem, akey, esub)
+	else
+		return false
 	end
+
+	return true
 end
 
 --- Extends @{LinkActionsAndEvents}, so that if either the action or event is missing
@@ -259,17 +264,18 @@ end
 -- @string akey Key under which the actions set is stored, in _elem_.
 -- @ptable props Valid properties, with per-type subtables.
 -- @string pkey Key under which the properties set is stored, in _elem_.
+-- @treturn boolean An action was performed?
 function M.LinkActionsEventsAndProperties (elem, other, esub, osub, events, actions, akey, props, pkey)
 	if events[esub] then
 		_AddId_(elem, esub, other.uid, osub)
 	elseif actions[esub] then
 		adaptive.AddToSet_Member(elem, akey, esub)
 	else
-		local pset = elem[pkey]
+		local pset, found = elem[pkey]
 
 		for k, pgroup in pairs(props) do
 			if pgroup[esub] then
-				pset = pset or {}
+				pset, found = pset or {}, true
 				pset[k] = adaptive.AddToSet(pset[k], esub)
 
 				break
@@ -277,6 +283,8 @@ function M.LinkActionsEventsAndProperties (elem, other, esub, osub, events, acti
 		end
 
 		elem[pkey] = pset
+
+		return found ~= nil
 	end
 end
 
