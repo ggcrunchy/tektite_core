@@ -24,10 +24,12 @@
 --
 
 -- Standard library imports --
+local assert = assert
 local find = string.find
 local format = string.format
 local ipairs = ipairs
 local pairs = pairs
+local rawequal = rawequal
 local rawget = rawget
 local setmetatable = setmetatable
 local sub = string.sub
@@ -43,6 +45,8 @@ local table_funcs = require("tektite_core.table.funcs")
 local _AddId_
 local _BroadcastBuilder_
 local _IterEvents_
+local _LinkActionsAndEvents_
+local _LinkActionsEventsAndProperties_ 
 local _Reset_
 local _Subscribe_
 
@@ -221,6 +225,85 @@ function M.IsCompositeId (id, split)
 	return is_composed
 end
 
+-- --
+local Cached
+
+local function TryInProps (elem, other, esub, osub, props)
+	for k, pgroup in pairs(props) do
+		if pgroup[esub] then
+			_AddId_(elem, esub, other.uid, osub)
+
+			return true
+		end
+	end
+
+	return false
+end
+
+local function TryOutProps (elem, esub, props, pkey)
+	local pset, found = elem[pkey], false
+
+	for k, pgroup in pairs(props) do
+		if pgroup[esub] then
+			pset, found = pset or {}, true
+			pset[k] = adaptive.AddToSet(pset[k], esub)
+
+			break
+		end
+	end
+
+	elem[pkey] = pset
+
+	return found
+end
+
+function M.PrepLink (elem, other, esub, osub)
+	local events, actions, akey, iprops, oprops, pkey
+
+	local helper = Cached or function(what, arg1, arg2, arg3, arg4)
+		if what == "commit" then
+			local found = true
+
+			if events and events[esub] then
+				_AddId_(elem, esub, other.uid, osub)
+			elseif actions and actions[esub] then
+				adaptive.AddToSet_Member(elem, akey, esub)
+			else
+				found = oprops and TryOutProps(elem, esub, oprops, pkey)
+				found = found or (iprops and TryInProps(elem, other, esub, osub, iprops))
+			end
+
+			Cached, events, actions, akey, iprops, oprops, pkey = helper
+
+			return found ~= nil
+		elseif rawequal(what, ComposeId) then -- arbitrary nonce
+			elem, other, esub, osub = arg1, arg2, arg3, arg4
+		else
+			assert(type(arg1) == "table", "Expected table as first argument")
+
+			if what == "try_actions" or what == "try_out_properties" then
+				assert(arg2 == nil or type(arg2) == "string", "Expected string key or nil as second argument")
+
+				if what == "try_actions" then
+					actions, akey = arg1, arg2 or "actions"
+				else
+					oprops, pkey = arg1, arg2 or "props"
+				end
+			elseif what == "try_events" then
+				events = arg1
+			elseif what == "try_in_properties" then
+				iprops = arg1
+			end
+		end
+	end
+
+	helper(ComposeId, elem, other, esub, osub)
+
+	Cached = nil
+
+	return helper
+end
+
 --- Convenience routine for the common case where an object binds both actions and events.
 --
 -- If _esub_ is present in _events_, an ID is added to _elem_ (as per @{AddId}, with _esub_
@@ -237,7 +320,7 @@ end
 -- @ptable events Valid events. 
 -- @ptable actions Valid actions.
 -- @string akey Key under which the actions set is stored, in _elem_.
--- @treturn boolean An action was performed?
+-- @treturn boolean Something was resolved?
 function M.LinkActionsAndEvents (elem, other, esub, osub, events, actions, akey)
 	if events[esub] then
 		_AddId_(elem, esub, other.uid, osub)
@@ -264,14 +347,12 @@ end
 -- @string akey Key under which the actions set is stored, in _elem_.
 -- @ptable props Valid properties, with per-type subtables.
 -- @string pkey Key under which the properties set is stored, in _elem_.
--- @treturn boolean An action was performed?
+-- @treturn boolean Something was resolved?
 function M.LinkActionsEventsAndProperties (elem, other, esub, osub, events, actions, akey, props, pkey)
-	if events[esub] then
-		_AddId_(elem, esub, other.uid, osub)
-	elseif actions[esub] then
-		adaptive.AddToSet_Member(elem, akey, esub)
+	if _LinkActionsAndEvents_(elem, other, esub, osub, events, actions, akey) then
+		return true
 	else
-		local pset, found = elem[pkey]
+		local pset, found = elem[pkey], false
 
 		for k, pgroup in pairs(props) do
 			if pgroup[esub] then
@@ -284,7 +365,39 @@ function M.LinkActionsEventsAndProperties (elem, other, esub, osub, events, acti
 
 		elem[pkey] = pset
 
-		return found ~= nil
+		return found
+	end
+end
+
+--- Extends @{LinkActionsEventsAndProperties} to also include in-properties.
+--
+-- If _esub_ is then present in _props_, the member under _esub_ in the property set will be
+-- set to **true** / present (these will be adapative sets analogous in shape to _props_).
+-- @ptable elem Element.
+-- @ptable other Other element.
+-- @string esub Name of element's sublink.
+-- @string osub Name of other element's sublink.
+-- @ptable events Valid events. 
+-- @ptable actions Valid actions.
+-- @string akey Key under which the actions set is stored, in _elem_.
+-- @ptable props Valid properties, with per-type subtables.
+-- @string pkey Key under which the properties set is stored, in _elem_.
+-- @ptable in_props Valid in-properties, iterated like _elem[pkey]_. Anything found is
+-- linked as per _events_, i.e. an ID is added to _elem_.
+-- @treturn boolean Something was resolved?
+function M.LinkActionsEventsAndOutInProperties (elem, other, esub, osub, events, actions, akey, props, pkey, in_props)
+	if _LinkActionsEventsAndProperties_(elem, other, esub, osub, events, actions, akey, props, pkey) then
+		return true
+	else
+		for k, pgroup in pairs(in_props) do
+			if pgroup[esub] then
+				_AddId_(elem, esub, other.uid, osub)
+
+				return true
+			end
+		end
+
+		return false
 	end
 end
 
@@ -366,6 +479,8 @@ end
 _AddId_ = M.AddId
 _BroadcastBuilder_ = M.BroadcastBuilder
 _IterEvents_ = M.IterEvents
+_LinkActionsAndEvents_ = M.LinkActionsAndEvents
+_LinkActionsEventsAndProperties_ = M.LinkActionsEventsAndProperties
 _Reset_ = M.Reset
 _Subscribe_ = M.Subscribe
 
