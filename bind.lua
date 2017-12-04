@@ -45,8 +45,6 @@ local table_funcs = require("tektite_core.table.funcs")
 local _AddId_
 local _BroadcastBuilder_
 local _IterEvents_
-local _LinkActionsAndEvents_
-local _LinkActionsEventsAndProperties_ 
 local _Reset_
 local _Subscribe_
 
@@ -225,11 +223,11 @@ function M.IsCompositeId (id, split)
 	return is_composed
 end
 
--- --
-local Cached
+-- Cached PrepLink helper function --
+local Helper
 
 local function TryInProps (elem, other, esub, osub, props)
-	for k, pgroup in pairs(props) do
+	for _, pgroup in pairs(props) do
 		if pgroup[esub] then
 			_AddId_(elem, esub, other.uid, osub)
 
@@ -257,148 +255,93 @@ local function TryOutProps (elem, esub, props, pkey)
 	return found
 end
 
+--- Provides a helper function to prepare an element for linking.
+--
+-- This is intended for editor-side use, namely in **"prep_link"** handlers.
+--
+-- **N.B.** The function is only meant for immediate use; arguments are bound internally when
+-- **PrepLink** is called and unbind following a commit.
+-- @ptable elem Element.
+-- @ptable other Other element.
+-- @string esub Name of element's sublink.
+-- @string osub Name of other element's sublink.
+-- @treturn function Link preparation function.
+--
+-- Calling code should invoke one or more of the following commands:
+--
+-- To associate events: `helper("try_events", events)`, with _events_ being a table.
+--
+-- For actions: `helper("try_actions", actions, akey)`, with _actions_ being a table and
+-- _akey_ a string (if absent, **"actions"** is assumed).
+--
+-- For in-properties: `helper("try_in_properties", in_props)`, with _in\_props_ being a table.
+--
+-- For out-properties: ``helper("try_out_properties", out_props, pkey)`, with _out\_props_
+-- being a table and _pkey_ a string (if absent, **"props"** is assumed).
+--
+-- After that, the following call should be performed: `ok = helper("commit")`. The relevant
+-- tables are searched until either `t[esub]` is non-false, in which case one of the actions
+-- described below is taken (_ok_ = **true**), or all options are exhausted (_ok_ = **false**).
+--
+-- Each scenario asks whether _esub_ is present as a key, ignoring the associated value. In
+-- the case of _events_ and _actions_, this is a direct lookup; on the other hand, properties
+-- are tables of per-type tables, with these subtables being searched.
+--
+-- If the key is found among _events_ or _in\_props_, the corresponding event or property is
+-- registered in _elem_ via @{AddId}, with the unique ID of _other_ and _osub_ as target ID
+-- and sublink name, respectively.
+--
+-- When found among _actions_ or _out\_props_, _esub_ is added to an adaptive set: `elem[akey]`
+-- or `elem[pkey]`, respectively, cf. @{tektite_core.table.adaptive.AddToSet_Member}.
 function M.PrepLink (elem, other, esub, osub)
-	local events, actions, akey, iprops, oprops, pkey
+	local helper, events, actions, akey, iprops, oprops, pkey
 
-	local helper = Cached or function(what, arg1, arg2, arg3, arg4)
-		if what == "commit" then
-			local found = true
-
-			if events and events[esub] then
-				_AddId_(elem, esub, other.uid, osub)
-			elseif actions and actions[esub] then
-				adaptive.AddToSet_Member(elem, akey, esub)
-			else
-				found = oprops and TryOutProps(elem, esub, oprops, pkey)
-				found = found or (iprops and TryInProps(elem, other, esub, osub, iprops))
-			end
-
-			Cached, events, actions, akey, iprops, oprops, pkey = helper
-
-			return found ~= nil
-		elseif rawequal(what, ComposeId) then -- arbitrary nonce
+	helper = Helper or function(what, arg1, arg2, arg3, arg4)
+		if rawequal(what, ComposeId) then -- arbitrary nonce
 			elem, other, esub, osub = arg1, arg2, arg3, arg4
 		else
-			assert(type(arg1) == "table", "Expected table as first argument")
+			assert(not Helper, "Link preparation already committed")
 
-			if what == "try_actions" or what == "try_out_properties" then
-				assert(arg2 == nil or type(arg2) == "string", "Expected string key or nil as second argument")
+			if what == "commit" then
+				local found = true
 
-				if what == "try_actions" then
-					actions, akey = arg1, arg2 or "actions"
+				if events and events[esub] then
+					_AddId_(elem, esub, other.uid, osub)
+				elseif actions and actions[esub] then
+					adaptive.AddToSet_Member(elem, akey, esub)
 				else
-					oprops, pkey = arg1, arg2 or "props"
+					found = oprops and TryOutProps(elem, esub, oprops, pkey)
+					found = found or (iprops and TryInProps(elem, other, esub, osub, iprops))
 				end
-			elseif what == "try_events" then
-				events = arg1
-			elseif what == "try_in_properties" then
-				iprops = arg1
+
+				Helper, events, actions, akey, iprops, oprops, pkey = helper -- re-cached helper
+
+				return found ~= nil
+			else
+				assert(type(arg1) == "table", "Expected table as first argument")
+
+				if what == "try_actions" or what == "try_out_properties" then
+					assert(arg2 == nil or type(arg2) == "string", "Expected string key or nil as second argument")
+
+					if what == "try_actions" then
+						actions, akey = arg1, arg2 or "actions"
+					else
+						oprops, pkey = arg1, arg2 or "props"
+					end
+				elseif what == "try_events" then
+					events = arg1
+				elseif what == "try_in_properties" then
+					iprops = arg1
+				end
 			end
 		end
 	end
 
-	helper(ComposeId, elem, other, esub, osub)
+	helper(ComposeId, elem, other, esub, osub) -- see above re. ComposeId
 
-	Cached = nil
+	Helper = nil -- errors might leave helper in inconsistent state, so detach until commitment
 
 	return helper
-end
-
---- Convenience routine for the common case where an object binds both actions and events.
---
--- If _esub_ is present in _events_, an ID is added to _elem_ (as per @{AddId}, with _esub_
--- as _key_, and _other_'s unique ID and _osub_ as _id_ and _sub_, respectively).
---
--- Otherwise, if _esub_ is present in _actions_, the member under _esub_ in the action set
--- will be set to **true**.
---
--- Intended for editor-side use, e.g. for use in a **"prep_link"** handler.
--- @ptable elem Element.
--- @ptable other Other element.
--- @string esub Name of element's sublink.
--- @string osub Name of other element's sublink.
--- @ptable events Valid events. 
--- @ptable actions Valid actions.
--- @string akey Key under which the actions set is stored, in _elem_.
--- @treturn boolean Something was resolved?
-function M.LinkActionsAndEvents (elem, other, esub, osub, events, actions, akey)
-	if events[esub] then
-		_AddId_(elem, esub, other.uid, osub)
-	elseif actions[esub] then
-		adaptive.AddToSet_Member(elem, akey, esub)
-	else
-		return false
-	end
-
-	return true
-end
-
---- Extends @{LinkActionsAndEvents}, so that if either the action or event is missing
--- a property is tried instead.
---
--- If _esub_ is then present in _props_, the member under _esub_ in the property set will be
--- set to **true** / present (these will be adapative sets analogous in shape to _props_).
--- @ptable elem Element.
--- @ptable other Other element.
--- @string esub Name of element's sublink.
--- @string osub Name of other element's sublink.
--- @ptable events Valid events. 
--- @ptable actions Valid actions.
--- @string akey Key under which the actions set is stored, in _elem_.
--- @ptable props Valid properties, with per-type subtables.
--- @string pkey Key under which the properties set is stored, in _elem_.
--- @treturn boolean Something was resolved?
-function M.LinkActionsEventsAndProperties (elem, other, esub, osub, events, actions, akey, props, pkey)
-	if _LinkActionsAndEvents_(elem, other, esub, osub, events, actions, akey) then
-		return true
-	else
-		local pset, found = elem[pkey], false
-
-		for k, pgroup in pairs(props) do
-			if pgroup[esub] then
-				pset, found = pset or {}, true
-				pset[k] = adaptive.AddToSet(pset[k], esub)
-
-				break
-			end
-		end
-
-		elem[pkey] = pset
-
-		return found
-	end
-end
-
---- Extends @{LinkActionsEventsAndProperties} to also include in-properties.
---
--- If _esub_ is then present in _props_, the member under _esub_ in the property set will be
--- set to **true** / present (these will be adapative sets analogous in shape to _props_).
--- @ptable elem Element.
--- @ptable other Other element.
--- @string esub Name of element's sublink.
--- @string osub Name of other element's sublink.
--- @ptable events Valid events. 
--- @ptable actions Valid actions.
--- @string akey Key under which the actions set is stored, in _elem_.
--- @ptable props Valid properties, with per-type subtables.
--- @string pkey Key under which the properties set is stored, in _elem_.
--- @ptable in_props Valid in-properties, iterated like _elem[pkey]_. Anything found is
--- linked as per _events_, i.e. an ID is added to _elem_.
--- @treturn boolean Something was resolved?
-function M.LinkActionsEventsAndOutInProperties (elem, other, esub, osub, events, actions, akey, props, pkey, in_props)
-	if _LinkActionsEventsAndProperties_(elem, other, esub, osub, events, actions, akey, props, pkey) then
-		return true
-	else
-		for k, pgroup in pairs(in_props) do
-			if pgroup[esub] then
-				_AddId_(elem, esub, other.uid, osub)
-
-				return true
-			end
-		end
-
-		return false
-	end
 end
 
 -- Waiting lists --
@@ -411,7 +354,7 @@ local Deferred = lazy.SubTablesOnDemand()
 -- is deferred until resolution occurs, cf. @{Resolve}.
 -- @param name Name of waiting list.
 -- @callable event The event to publish.
--- @int[opt] id ID of object to which the event belongs, e.g. its target or a dummy singleton.
+-- @tparam int|nil id ID of object to which the event belongs, e.g. its target or a dummy singleton.
 --
 -- If absent, this is a no-op.
 --
@@ -479,8 +422,6 @@ end
 _AddId_ = M.AddId
 _BroadcastBuilder_ = M.BroadcastBuilder
 _IterEvents_ = M.IterEvents
-_LinkActionsAndEvents_ = M.LinkActionsAndEvents
-_LinkActionsEventsAndProperties_ = M.LinkActionsEventsAndProperties
 _Reset_ = M.Reset
 _Subscribe_ = M.Subscribe
 
