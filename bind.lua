@@ -228,7 +228,7 @@ local Helper
 
 local function TryInProps (elem, other, esub, osub, props)
 	for _, pgroup in pairs(props) do
-		if pgroup[esub] then
+		if adaptive.InSet(pgroup, esub) then
 			_AddId_(elem, esub, other.uid, osub)
 
 			return true
