@@ -28,6 +28,7 @@ local assert = assert
 local find = string.find
 local format = string.format
 local ipairs = ipairs
+local next = next
 local pairs = pairs
 local rawequal = rawequal
 local rawget = rawget
@@ -226,6 +227,37 @@ end
 -- Cached PrepLink helper function --
 local Helper
 
+local function TryInstances (elem, other, esub, osub, itls, instance_ids)
+	local f, s, ii_key = adaptive.IterArray(instance_ids)
+
+	for _, itl_key in adaptive.IterArray(itls) do
+		local instance_to_label = elem[itl_key]
+		local label = instance_to_label and instance_to_label[esub]
+
+		_, ii_key = f(s, ii_key)
+
+		if label then
+			local list = elem[ii_key] or {}
+
+			_AddId_(list, label, other.uid, osub)
+
+			elem[ii_key] = list
+
+			-- Cull the labels. In most circumstances IDs could be bound directly into the table,
+			-- but this accounts for the case of labels also being instance names.
+			instance_to_label[sub] = nil
+
+			if next(instance_to_label, nil) == nil then
+				elem[itl_key] = nil
+			end
+
+			return true
+		end
+	end
+
+	return false
+end
+
 local function TryInProps (elem, other, esub, osub, props)
 	for _, pgroup in pairs(props) do
 		if adaptive.InSet(pgroup, esub) then
@@ -294,7 +326,7 @@ end
 -- When found among _actions_ or _out\_props_, _esub_ is added to an adaptive set: `elem[akey]`
 -- or `elem[pkey]`, respectively, cf. @{tektite_core.table.adaptive.AddToSet_Member}.
 function M.PrepLink (elem, other, esub, osub)
-	local helper, events, actions, akey, iprops, oprops, pkey
+	local helper, events, actions, akey, iprops, oprops, pkey, itls, instance_ids
 
 	helper = Helper or function(what, arg1, arg2, arg3, arg4)
 		if rawequal(what, ComposeId) then -- arbitrary nonce
@@ -310,13 +342,21 @@ function M.PrepLink (elem, other, esub, osub)
 				elseif actions and actions[esub] then
 					adaptive.AddToSet_Member(elem, akey, esub)
 				else
-					found = oprops and TryOutProps(elem, esub, oprops, pkey)
+					found = itls and TryInstances(elem, other, esub, osub, itls, instance_ids)
+					found = found or (oprops and TryOutProps(elem, esub, oprops, pkey))
 					found = found or (iprops and TryInProps(elem, other, esub, osub, iprops))
 				end
 
-				Helper, events, actions, akey, iprops, oprops, pkey = helper -- re-cached helper
+				Helper, events, actions, akey, iprops, oprops, pkey, itls, instance_ids = helper -- re-cached helper
 
 				return found ~= nil
+			elseif what == "try_instances" then
+				assert(type(arg1) == "string", "Expected string key for instance -> label map")
+				assert(type(arg2) == "string", "Expected string key for resolved instances map")
+				assert(arg1 ~= arg2, "Keys for instance -> label and resolved instances map must differ")
+
+				itls = adaptive.Append(itls, arg1)
+				instance_ids = adaptive.Append(instance_ids, arg2)
 			else
 				assert(type(arg1) == "table", "Expected table as first argument")
 
