@@ -358,7 +358,7 @@ function M.PrepLink (elem, other, esub, osub)
 				Helper, events, actions, akey, iprops, oprops, pkey, itls, instance_ids = helper -- re-cached helper
 
 				return found ~= nil
-			elseif what == "try_instances" then
+			elseif what == "try_in_instances" then
 				assert(type(arg1) == "string", "Expected string key for instance -> label map")
 				assert(type(arg2) == "string", "Expected string key for resolved instances map")
 				assert(arg1 ~= arg2, "Keys for instance -> label and resolved instances map must differ")
