@@ -133,7 +133,7 @@ end
 
 --- Variant of @{BroadcastBuilder} that supplies a helper object to facilitate certain
 -- common broadcast use cases.
--- @param name Name of waiting list.
+-- @param[opt] name Name of waiting list. If absent, this must be provided by @{broadcast_helper:Subscribe}.
 -- @treturn broadcast_helper Object with some useful functions.
 function M.BroadcastBuilder_Helper (name)
 	local broadcast_helper, builder, object_to_broadcaster = {}, _BroadcastBuilder_()
@@ -165,7 +165,13 @@ function M.BroadcastBuilder_Helper (name)
 	-- @tparam ?|string|array|nil id As per @{Subscribe}.
 	-- @string? wname If provided, use the named waiting list.
 	function broadcast_helper.Subscribe (object, id, wname)
-		_Subscribe_(wname or name, id, builder, object)
+		if name == nil then
+			assert(wname ~= nil, "Missing waiting list name")
+
+			name = wname
+		end
+
+		_Subscribe_(name, id, builder, object)
 	end
 
 	-- Hook up a metatable for __call and supply the helper. Add the key in case the user
