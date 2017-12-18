@@ -27,11 +27,11 @@
 local assert = assert
 local find = string.find
 local format = string.format
-local ipairs = ipairs
 local next = next
 local pairs = pairs
 local rawequal = rawequal
 local rawget = rawget
+local remove = table.remove
 local setmetatable = setmetatable
 local sub = string.sub
 local tonumber = tonumber
@@ -39,8 +39,13 @@ local type = type
 
 -- Modules --
 local adaptive = require("tektite_core.table.adaptive")
+local frames = require("corona_utils.frames")
 local lazy = require("tektite_core.table.lazy")
 local table_funcs = require("tektite_core.table.funcs")
+
+-- Corona globals --
+local Runtime = Runtime
+local system = system
 
 -- Cached module references --
 local _AddId_
@@ -71,6 +76,83 @@ end
 -- @see tektite_core.table.adaptive.Append_Member
 function M.AddId (elem, key, id, sub)
 	adaptive.Append_Member(elem, key, ComposeId(id, sub))
+end
+
+-- --
+local Count, Limit = 0
+
+local TryToResetCount = frames.OnFirstCallInFrame(function()
+	Count = 0
+end)
+
+--- DOCME
+function M.AddCalls (n)
+	TryToResetCount()
+
+	local count = Count + n
+
+	assert(Limit, "Calls require a limit")
+	assert(count <= Limit, "Too many calls")
+
+	Count = count
+end
+
+-- --
+local Tally, LastReported, OnTooManyEvent = 0, 0
+
+local function TryToReport ()
+	local now = system.getTimer()
+
+	Tally = Tally + 1
+
+	if LastReported - now >= 3000 then -- throttle the reports
+		OnTooManyEvent = OnTooManyEvent or {}
+		OnTooManyEvent.name, OnTooManyEvent.tally = "too_many_actions", Tally
+
+		Runtime:dispatchEvent(OnTooManyEvent)
+
+		LastReported, Tally = now, 0
+	end	
+end
+
+local function AdjustN (n)
+	if Limit and Count + n > Limit then
+		return Limit - Count
+	else
+		return n
+	end
+end
+
+local BoxesStash = {}
+
+local function Box (event)
+	local box = remove(BoxesStash)
+
+	if box then
+		box(ComposeId, event) -- arbitrary nonce
+	else
+		function box (arg1, arg2)
+			if rawequal(arg1, ComposeId) then -- as per note
+				if arg2 == "get" then
+					return event
+				elseif arg2 == "extract" then
+					arg2, event = event
+
+					return arg2
+				else
+					event = arg2 -- N.B. captured at first, thus only need this on reuse
+				end
+			elseif arg1 ~= "i" and arg1 ~= "n" then
+				if AdjustN(1) == 0 then
+					return TryToReport()
+				else
+					return event()
+				end
+			end
+		end
+	end
+
+	return box
 end
 
 --- Convenience routine for building a subscribe function that in turn will populate a
@@ -107,17 +189,26 @@ function M.BroadcastBuilder ()
 
 		if curf then
 			if not list then
-				list = { curf }
+				list, BoxesStash[#BoxesStash + 1] = { curf(ComposeId, "extract") }, curf -- see note in Box()
 
-				object_to_broadcaster[object] = function(arg1, arg2, ...)
-					if arg1 == "n" then
-						return #list
-					elseif arg1 == "i" then
+				object_to_broadcaster[object] = function(arg1, arg2)
+					if arg1 == "i" then
 						return list[arg2]
 					end
 
-					for _, func in ipairs(list) do
-						func(arg1, arg2, ...)
+					local expected_n = #list
+					local n = AdjustN(expected_n)
+
+					if arg1 == "n" then
+						return n
+					end
+
+					for i = 1, n do
+						list[i]()
+					end
+
+					if n < expected_n then
+						TryToReport()
 					end
 				end
 			end
@@ -126,7 +217,7 @@ function M.BroadcastBuilder ()
 
 		-- No events yet: add the first one.
 		else
-			object_to_broadcaster[object] = func
+			object_to_broadcaster[object] = Box(func)
 		end
 	end, object_to_broadcaster
 end
@@ -184,10 +275,20 @@ end
 -- Event iterator body
 local function AuxEvent (event, index)
 	if not index then
-		return event and 0, event
+		if event and (not Limit or Count < Limit) then
+			return 0, event(ComposeId, "get") -- see note in Box()
+		end
 	elseif index > 0 then
 		return index - 1, event("i", index)
 	end
+end
+
+-- --
+local Commands = table_funcs.Weak("k")
+
+--- DOCME
+function M.GetActionCommands (action)
+	return Commands[action]
 end
 
 --- Convenience routine for iterating the component events that make up a broadcast (i.e. a
@@ -444,6 +545,21 @@ function M.Resolve (name)
 	end
 
 	_Reset_(name)
+end
+
+--- DOCME
+function M.SetActionCommands (action, cmds)
+	assert(type(action) == "function", "Non-function action")
+	assert(cmds == nil or type(cmds) == "function", "Non-function commands")
+
+	Commands[action] = cmds
+end
+
+--- DOCME
+function M.SetActionLimit (limit)
+	assert(type(limit) == "number" and limit > 0, "Invalid limit")
+
+	Limit = limit
 end
 
 --- Subscribes to 0 or more events. This is intended as a startup process that associates
