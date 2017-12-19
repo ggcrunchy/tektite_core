@@ -23,7 +23,13 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
+-- Standard library imports --
+local rawequal = rawequal
+local remove = table.remove
+
 -- Cached module references --
+local _IsEmpty_
+local _IsFull_
 local _Push_
 
 -- Exports --
@@ -45,6 +51,50 @@ end
 -- @treturn boolean The ring buffer is full?
 function M.IsFull (head)
 	return head == Full
+end
+
+-- --
+local Iters = {}
+
+local function DefIter () end
+
+--- DOCME
+function M.Iterate (arr, head, tail, len)
+	if _IsEmpty_(head, tail) then
+		return DefIter
+	else
+		len = len or #arr
+
+		local is_full, iter, last = _IsFull_(head), remove(Iters)
+
+		if is_full then
+			last = tail == 1 and len or tail - 1
+		else
+			last = head
+		end
+
+		if iter then
+			iter(DefIter, last, len) -- arbitrary nonce
+		else
+			function iter (from, index, arg)
+				if rawequal(from, DefIter) then -- see above note
+					last, len = index, arg
+				elseif index ~= last then
+					if not index then -- when full, first index = false, cf. note below
+						index = last ~= len and last + 1 or len
+					else
+						index = index ~= len and index + 1 or 1
+					end
+
+					return index, from[index]
+				else
+					Iters[#Iters + 1] = iter
+				end
+			end
+		end
+
+		return iter, arr, not is_full and tail - 1 -- encode tail when full to avoid tripping index == last check
+	end
 end
 
 -- Helper to advance head or tail
@@ -119,6 +169,8 @@ function M.Push_Guarded (arr, elem, head, tail, len)
 end
 
 -- Cache module members.
+_IsEmpty_ = M.IsEmpty
+_IsFull_ = M.IsFull
 _Push_ = M.Push
 
 -- Export the module.
