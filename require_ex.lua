@@ -34,7 +34,7 @@ local type = type
 local M = {}
 
 -- Helper logic for DoList and GetNames
-local function AuxDo (from, list, action, categories, base_prefix, acc, splice)
+local function AuxDo (from, list, action, categories, base_prefix, names_as_keys, acc, splice)
 	local category, prefix, n, res = from._category, from._prefix or base_prefix, splice and #list
 
 	categories = categories or (category and {})
@@ -44,7 +44,9 @@ local function AuxDo (from, list, action, categories, base_prefix, acc, splice)
 		if k ~= "_category" and k ~= "_prefix" then
 			res, acc = action(v, prefix, acc)
 
-			if n and type(k) == "number" and k % 1 == 0 then
+			if names_as_keys then
+				list[v] = res
+			elseif n and type(k) == "number" and k % 1 == 0 then
 				list[n + k] = res
 			else
 				list[k] = res
@@ -62,16 +64,16 @@ end
 --
 local function Do (name, action)
 	local from, list, acc = require(name), {}
-	local is_array, base_prefix, categories = from._is_array, from._prefix
+	local is_array, base_prefix, names_as_keys, categories = from._is_array, from._prefix, from._names_as_keys
 
 	if is_array then
 		local splice = categories or is_array == "splice_sequence"
 
 		for _, v in ipairs(from) do
-			acc, categories = AuxDo(v, list, action, categories, base_prefix, acc, splice)
+			acc, categories = AuxDo(v, list, action, categories, base_prefix, names_as_keys, acc, splice)
 		end
 	else
-		acc, categories = AuxDo(from, list, action, categories, base_prefix)
+		acc, categories = AuxDo(from, list, action, categories, base_prefix, names_as_keys)
 	end
 
 	return list, acc, categories
