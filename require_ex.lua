@@ -34,13 +34,14 @@ local type = type
 local M = {}
 
 -- Helper logic for DoList and GetNames
-local function AuxDo (from, list, action, acc, n)
-	local prefix, res = from._prefix
+local function AuxDo (from, list, action, categories, base_prefix, acc, splice)
+	local category, prefix, n, res = from._category, from._prefix or base_prefix, splice and #list
 
+	categories = categories or (category and {})
 	prefix = prefix and prefix .. "." or ""
 
 	for k, v in pairs(from) do
-		if k ~= "_prefix" then
+		if k ~= "_category" and k ~= "_prefix" then
 			res, acc = action(v, prefix, acc)
 
 			if n and type(k) == "number" and k % 1 == 0 then
@@ -48,28 +49,32 @@ local function AuxDo (from, list, action, acc, n)
 			else
 				list[k] = res
 			end
+
+			if category then
+				categories[v] = category
+			end
 		end
 	end
 
-	return acc
+	return acc, categories
 end
 
 --
 local function Do (name, action)
 	local from, list, acc = require(name), {}
-	local is_array = from._is_array
+	local is_array, base_prefix, categories = from._is_array, from._prefix
 
 	if is_array then
-		local splice = is_array == "splice_sequence"
+		local splice = categories or is_array == "splice_sequence"
 
 		for _, v in ipairs(from) do
-			acc = AuxDo(v, list, action, acc, splice and #list)
+			acc, categories = AuxDo(v, list, action, categories, base_prefix, acc, splice)
 		end
 	else
-		acc = AuxDo(from, list, action)
+		acc, categories = AuxDo(from, list, action, categories, base_prefix)
 	end
 
-	return list, acc
+	return list, acc, categories
 end
 
 --
@@ -96,8 +101,11 @@ end
 -- any integer key in the list, to give its index in the output. The gist of this is that,
 -- when the array parts are spliced together, the final result is also a proper sequence.
 -- @treturn table Key-module pairs; a module is found under the same key as was its name.
+-- @treturn boolean Is non-categorized list?
 function M.DoList (name)
-	return (Do(name, Require))
+	local list, _, categories = Do(name, Require)
+
+	return list, categories
 end
 
 --- Variant of @{DoList} that takes a list of names.
@@ -140,6 +148,7 @@ end
 -- @treturn table Key-name pairs.
 -- @treturn string If a **_prefix** key was found in the list, its value (plus a trailing
 -- dot); otherwise, the empty string.
+-- @treturn ?|table|nil Categorized names.
 function M.GetNames (name)
 	return Do(name, GroupPrefixAndReturn)
 end
