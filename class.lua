@@ -37,6 +37,7 @@ local type = type
 
 -- Modules --
 local exception = require("tektite_core.exception")
+local table_meta = require("tektite_core.table.meta")
 local table_funcs = require("tektite_core.table.funcs")
 local var_preds = require("tektite_core.var.predicates")
 
@@ -49,10 +50,10 @@ local _IsInstance_
 local _IsType_
 
 -- Instance / type mappings --
-local Instances = table_funcs.Weak("k")
+local Instances = table_meta.Weak("k")
 
 -- Class definitions --
-local Defs = table_funcs.Weak("k")
+local Defs = table_meta.Weak("k")
 
 -- Built-in type set --
 local BuiltIn = table_funcs.MakeSet{ "boolean", "function", "nil", "number", "string", "table", "thread", "userdata" }
@@ -70,7 +71,7 @@ local Metamethods = table_funcs.MakeSet{
 local M = {}
 
 -- Linearization heads, i.e. the classes themselves --
-local Heads = table_funcs.Weak("v")
+local Heads = table_meta.Weak("v")
 
 -- Weak-mode, __index'd table
 local function WeakIndexed (ifunc)
@@ -145,7 +146,7 @@ do
 	end)
 
 	-- Per-instance data for default allocations --
-	local InstanceData = table_funcs.Weak("k")
+	local InstanceData = table_meta.Weak("k")
 
 	-- Default instance allocator
 	local function DefaultAlloc (meta)

@@ -376,29 +376,8 @@ function M.Move (t, how, how_arg)
 	return dt
 end
 
-do
-	-- Weak table choices --
-	local Choices = { "k", "v", "kv" }
-
-	for i, mode in ipairs(Choices) do
-		Choices[mode], Choices[i] = { __metatable = true, __mode = mode }
-	end
-
-	--- Builds a new weak table.
-	--
-	-- The table's metatable is fixed.
-	-- @string choice Weak option, which is one of **"k"**, **"v"**, or **"kv"**,
-	-- and will assign that behavior to the **__mode** key of the table's metatable.
-	-- @treturn table Table.
-	function M.Weak (choice)
-		local dt = GetTable()
-
-		return setmetatable(dt, assert(Choices[choice], "Invalid weak option"))
-	end
-end
-
 -- Register bound-table functions.
-GetTable = bound_args.Register{ M.Copy, M.CopyK, AuxDeepCopy, M.DeepCopy, M.Invert, M.MakeSet, M.Map, M.MapK, M.MapKV, M.Move, M.Weak }
+GetTable = bound_args.Register{ M.Copy, M.CopyK, AuxDeepCopy, M.DeepCopy, M.Invert, M.MakeSet, M.Map, M.MapK, M.MapKV, M.Move }
 
 -- Cache module members.
 _Map_ = M.Map
