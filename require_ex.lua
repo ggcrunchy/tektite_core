@@ -24,7 +24,9 @@
 --
 
 -- Standard library imports --
+local getmetatable = getmetatable
 local ipairs = ipairs
+local newproxy = newproxy
 local pairs = pairs
 local require = require
 local setmetatable = setmetatable
@@ -155,21 +157,42 @@ function M.GetNames (name)
 	return Do(name, GroupPrefixAndReturn)
 end
 
+-- Lazy require proxies --
+local ProxyToInfo = setmetatable({}, { __mode = "k" })
+
+local function GetModule (proxy)
+	local info = ProxyToInfo[proxy]
+
+	if not info.module then
+		info.module = require(info.name)
+	end
+
+	return info.module
+end
+
+local ProxyProto = newproxy(true)
+
+local ProxyProtoMT = getmetatable(ProxyProto)
+
+function ProxyProtoMT:__call (...)
+	return GetModule(self)(...)
+end
+
+function ProxyProtoMT:__index (k)
+	return GetModule(self)[k]
+end
+
 --- Helper to deal with circular module require situations. Provided module access is not
 -- needed immediately (in particular, it can wait until the requiring module has loaded),
 -- the lazy-required module looks like and may be treated as a normal module.
 -- @string name Module name, as passed to @{require}.
 -- @treturn table Module proxy, to be accessed like the module proper.
 function M.Lazy (name)
-	local mod
+	local proxy = newproxy(ProxyProto)
 
-	return setmetatable({}, {
-		__index = function(_, k)
-			mod = mod or require(name)
+	ProxyToInfo[proxy] = { name = name }
 
-			return mod[k]
-		end
-	})
+	return proxy
 end
 
 -- Export the module.
