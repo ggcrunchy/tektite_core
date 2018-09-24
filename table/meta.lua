@@ -79,18 +79,20 @@ function M.Augment (object, extension)
 		local list, old_index, old_newindex = {}, mt and mt.__index, mt and mt.__newindex
 
 		for k, v in pairs(extension) do
-			if k ~= "__iprops" and k ~= "__oprops" then
+			if k ~= "__rprops" and k ~= "__wprops" then
 				list[k] = v
 			end
 		end
 
+		setmetatable(list, getmetatable(extension))
+
 		local is_table_oi, index = type(old_index) == "table"
 
-		if extension.__iprops then
-			local iprops = Copy(extension.__iprops, "Invalid in-properties (__iprops)")
+		if extension.__rprops then
+			local rprops = Copy(extension.__rprops, "Invalid readable properties (__rprops)")
 
 			function index (t, k)
-				local prop = iprops[k]
+				local prop = rprops[k]
 
 				if prop then
 					local what, res = prop(t)
@@ -130,11 +132,11 @@ function M.Augment (object, extension)
 
 		local is_table_oni, newindex = type(old_newindex) == "table"
 
-		if extension.__oprops then
-			local oprops = Copy(extension.__oprops, "Invalid out-properties (__oprops)")
+		if extension.__wprops then
+			local wprops = Copy(extension.__wprops, "Invalid writeable properties (__wprops)")
 
 			function newindex (t, k, v)
-				local prop = oprops[k]
+				local prop = wprops[k]
 
 				if prop then
 					local what, res1, res2 = prop(t, v)
