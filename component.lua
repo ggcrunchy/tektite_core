@@ -214,30 +214,28 @@ function M.FoundInObject (object, ctype)
     return false
 end
 
+local function AuxImplements (info, what)
+    for i = 1, #(info or "") do
+        if rawequal(info[i], what) then
+            return true
+        end
+    end
+end
+
 --- DOCME
 function M.Implements (ctype, what)
     local info = Types[ctype]
 
     assert(info ~= nil, "Type not registered")
 
-    for i = 1, #(info or "") do
-        if rawequal(info[i], what) then
-            return true
-        end
-    end
-
-    return false
+    return AuxImplements(info, what) or false -- coerce nil to false
 end
 
 --- DOCME
 function M.ImplementedByObject (object, what)
     for comp in adaptive.IterSet(Lists[object]) do
-        local info = Types[comp]
-
-        for i = 1, #(info or "") do
-            if rawequal(info[i], what) then
-                return true
-            end
+        if AuxImplements(Types[comp], what) then
+            return true
         end
     end
 
