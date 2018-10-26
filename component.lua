@@ -27,6 +27,7 @@
 local assert = assert
 local pairs = pairs
 local rawequal = rawequal
+local tostring = tostring
 local type = type
 
 -- Modules --
@@ -244,17 +245,42 @@ end
 
 local Locks = meta.Weak("k")
 
+local Inf = 1 / 0
+
+local function NotLocked (locks, ctype)
+	local count = locks[ctype] or 0
+
+    return 1 / count ~= 0
+end
+
 --- DOCME
 function M.LockInObject (object, ctype)
-    local locks = Locks[object]
+    local locks = Locks[object] or {}
 
-    if not adaptive.InSet(locks, ctype) then
+    if NotLocked(locks, ctype) then
+		GatherRequiredTypes(ctype) -- n.b. set up before component added
+
+		for rtype in pairs(RequiredTypes) do
+			locks[rtype], RequiredTypes[rtype] = Inf
+		end
+    end
+
+	Locks[object] = locks
+end
+
+--- DOCME
+function M.RefInObject (object, ctype)
+    local locks = Locks[object] or {}
+	
+	if NotLocked(locks, ctype) then
         GatherRequiredTypes(ctype) -- n.b. set up before component added
 
         for rtype in pairs(RequiredTypes) do
-            locks, RequiredTypes[rtype] = adaptive.AddToSet(locks, rtype)
+            locks[rtype], RequiredTypes[rtype] = (locks[rtype] or 0) + 1 -- infinity left as-is
         end
     end
+
+	Locks[object] = locks
 end
 
 local Methods = { add = true, allow_add = true, remove = true }
@@ -323,7 +349,7 @@ function M.RemoveAllFromObject (object)
         local list = Lists[object]
 
         for comp in adaptive.IterSet(list) do
-            if not adaptive.InSet(locks, comp) then
+            if not locks[comp] then
                 AuxRemove(object, comp)
 
                 list = adaptive.RemoveFromSet(list, comp)
@@ -346,7 +372,9 @@ local ToRemove = {}
 function M.RemoveFromObject (object, ctype)
     assert(Types[ctype] ~= nil, "Type not registered")
 
-    if adaptive.InSet(Locks[object], ctype) then
+	local locks = Locks[object]
+
+    if locks and locks[ctype] then
         return false
     end
 
@@ -393,6 +421,29 @@ function M.RemoveFromObject (object, ctype)
     end
 
     return exists
+end
+
+--- DOCME
+function M.UnrefInObject (object, ctype)
+    local locks = Locks[object]
+
+	if locks and NotLocked(locks, ctype) then
+        GatherRequiredTypes(ctype) -- n.b. set up before component added
+
+		for rtype in pairs(RequiredTypes) do -- detect improper usage, e.g. unref'ing required type directly
+			if not locks[rtype] then
+				assert(false, "Bad ref count for component: " .. tostring(rtype))
+			end
+		end
+
+        for rtype in pairs(RequiredTypes) do
+			local new_count = locks[rtype] - 1 -- infinity left as-is
+
+            locks[rtype], RequiredTypes[rtype] = new_count > 0 and new_count
+        end
+    end
+
+	Locks[object] = locks
 end
 
 -- Cache module members.
