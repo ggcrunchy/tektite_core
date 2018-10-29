@@ -65,7 +65,13 @@ end
 
 local Lists = meta.Weak("k")
 
---- DOCME
+--- Add a component to an object.
+--
+-- TODO: on_add(object, new_type)
+-- @param object
+-- @param ctype Component type.
+-- @treturn boolean The addition succeeded.
+-- @see CanAddToObject
 function M.AddToObject (object, ctype)
     local can_add = _CanAddToObject_(object, ctype)
 
@@ -135,7 +141,15 @@ local function EnsureRequiredTypesInfo (info)
     return true
 end
 
---- DOCME
+--- Check whether the object can accept the component.
+--
+-- TODO: allow_add(new_type, object, existing_type)...
+-- @param object
+-- @param ctype Component type.
+-- @return[1] **true**, meaning the addition would succeed.
+-- @return[2] **false**, indicating failure.
+-- @treturn string Failure reason.
+-- @see AddToObject
 function M.CanAddToObject (object, ctype)
     local list, info = Lists[object], Types[ctype]
 
@@ -164,7 +178,13 @@ function M.CanAddToObject (object, ctype)
     return true
 end
 
---- DOCME
+--- Get the list of interfaces implemented by an object's components.
+-- @param object
+-- @tparam[opt] table out If provided, this will be populated and used as the return value.
+--
+-- The final size will be trimmed down to the number of interfaces, if necessary.
+-- @treturn {Interface,...} Array of interfaces, with duplicates removed.
+-- @see Implements, RegisterType
 function M.GetInterfacesForObject (object, out)
     out = out or {}
 
@@ -187,7 +207,13 @@ function M.GetInterfacesForObject (object, out)
     return out
 end
 
---- DOCME
+--- Get the list of component types belonging to an object.
+-- @param object
+-- @tparam[opt] table out If provided, this will be populated and used as the return value.
+--
+-- The final size will be trimmed down to the number of components, if necessary.
+-- @treturn {ComponentType,...} Array of types.
+-- @see AddToObject, RegisterType
 function M.GetListForObject (object, out)
     out = out or {}
 
@@ -204,7 +230,10 @@ function M.GetListForObject (object, out)
     return out
 end
 
---- DOCME
+---
+-- @param object
+-- @param ctype Component type.
+-- @treturn boolean Does _ctype_ belong to _object_?
 function M.FoundInObject (object, ctype)
     for comp in adaptive.IterSet(Lists[object]) do
         if rawequal(comp, ctype) then
@@ -223,7 +252,10 @@ local function AuxImplements (info, what)
     end
 end
 
---- DOCME
+---
+-- @param ctype Component type.
+-- @param what Interface.
+-- @treturn boolean Does _ctype_ implement _what_?
 function M.Implements (ctype, what)
     local info = Types[ctype]
 
@@ -232,7 +264,10 @@ function M.Implements (ctype, what)
     return AuxImplements(info, what) or false -- coerce nil to false
 end
 
---- DOCME
+---
+-- @param object
+-- @param what Interface.
+-- @treturn boolean Does _object_ have a component that implements _what_?
 function M.ImplementedByObject (object, what)
     for comp in adaptive.IterSet(Lists[object]) do
         if AuxImplements(Types[comp], what) then
@@ -253,7 +288,12 @@ local function NotLocked (locks, ctype)
     return 1 / count ~= 0
 end
 
---- DOCME
+--- Permanently lock a component into this object.
+--
+-- This will override any reference counting on the component.
+-- @param object
+-- @param ctype Component type.
+-- @see RefInObject, RemoveAllFromObject, RemoveFromObject, UnrefInObject
 function M.LockInObject (object, ctype)
     local locks = Locks[object] or {}
 
@@ -268,7 +308,11 @@ function M.LockInObject (object, ctype)
 	Locks[object] = locks
 end
 
---- DOCME
+--- Increment the reference count (starting at 0) on a component. While this count is greater
+-- than 0, the component is locked.
+--
+-- This is a no-op after @{LockInObject} has been called.
+-- @see RemoveAllFromObject, RemoveFromObject, UnrefInObject
 function M.RefInObject (object, ctype)
     local locks = Locks[object] or {}
 	
@@ -276,7 +320,7 @@ function M.RefInObject (object, ctype)
         GatherRequiredTypes(ctype) -- n.b. set up before component added
 
         for rtype in pairs(RequiredTypes) do
-            locks[rtype], RequiredTypes[rtype] = (locks[rtype] or 0) + 1 -- infinity left as-is
+            locks[rtype], RequiredTypes[rtype] = (locks[rtype] or 0) + 1 -- if infinity, left as-is
         end
     end
 
@@ -285,7 +329,16 @@ end
 
 local Methods = { add = true, allow_add = true, remove = true }
 
---- DOCME
+--- Register a new component type.
+-- @tparam ?|table|string As a string, the name of the component.
+--
+-- Otherwise, a table with one or more of the following:
+-- * **name**: The aforesaid name. (Required.)
+-- * **interfaces**: Array of interfaces implemented by this component. (Optional.)
+-- * **methods**: Table that may contain **add**, **allow\_add**, and **remove** functions. (Optional.)
+-- * **requires**: Array of component types that an object must also contain in order to have
+-- this component. These need not have been registered yet. (Optional.)
+-- @see AddToObject, CanAddToObject, RemoveFromObject
 function M.RegisterType (params)
     local ptype, name, interfaces, methods, requires = type(params)
 
@@ -298,9 +351,9 @@ function M.RegisterType (params)
     end
 
     assert(name ~= nil, "Expected component name")
-    assert(Types[name] == nil, "Name already in use")
 
     if interfaces or methods or requires then
+		assert(Types[name] == nil, "Name already in use")
         assert(methods == nil or type(methods) == "table", "Invalid methods")
 
         local ctype = {}
@@ -328,6 +381,8 @@ function M.RegisterType (params)
 
         Types[name] = ctype
     else
+		assert(not Types[name], "Complex type already registered") -- previous false okay
+
         Types[name] = false
     end
 end
@@ -341,7 +396,9 @@ local function AuxRemove (object, comp)
     end
 end
 
---- DOCME
+--- Remove any components from an object that are not locked or referenced, cf. @{RemoveFromObject}.
+-- @param object
+-- @see LockInObject, RefInObject
 function M.RemoveAllFromObject (object)
     local locks = Locks[object]
 
@@ -368,7 +425,13 @@ end
 
 local ToRemove = {}
 
---- DOCME
+--- Remove a component from an object, if not locked or referenced.
+--
+-- TODO: remove(object, removed_type)
+-- @param object
+-- @param ctype Component type.
+-- @treturn boolean The remove succeeded, i.e. the component existed and was removable?
+-- @see LockInObject, RefInObject, RemoveAllFromObject
 function M.RemoveFromObject (object, ctype)
     assert(Types[ctype] ~= nil, "Type not registered")
 
@@ -423,7 +486,12 @@ function M.RemoveFromObject (object, ctype)
     return exists
 end
 
---- DOCME
+--- Decrement the reference count for a component, unlocking it if the count falls to 0.
+--
+-- This is a no-op after @{LockInObject} has been called.
+--
+-- In a well-behaved implementation, this must follow a previous `RefInObject(object, ctype)` call.
+-- @see LockInObject, RemoveAllFromObject, RemoveFromObject
 function M.UnrefInObject (object, ctype)
     local locks = Locks[object]
 
@@ -437,7 +505,7 @@ function M.UnrefInObject (object, ctype)
 		end
 
         for rtype in pairs(RequiredTypes) do
-			local new_count = locks[rtype] - 1 -- infinity left as-is
+			local new_count = locks[rtype] - 1 -- if infinity, left as-is
 
             locks[rtype], RequiredTypes[rtype] = new_count > 0 and new_count
         end
