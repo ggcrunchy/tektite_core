@@ -25,8 +25,10 @@
 
 -- Standard library imports --
 local assert = assert
+local next = next
 local pairs = pairs
 local rawequal = rawequal
+local remove = table.remove
 local tostring = tostring
 local type = type
 
@@ -46,21 +48,55 @@ local M = {}
 --
 --
 
-local RequiredTypes, Types = {}, {}
+local RequiredTypeCache = {} -- allow lock and ref ops in add
 
-local function GatherRequiredTypes (ctype)
-    RequiredTypes[ctype] = true
+local Types = {}
+
+local function AuxGatherRequiredTypes (required_types, ctype)
+    required_types[ctype] = true
 
     local info = Types[ctype]
     local reqs = info and info.requirements
 
     if reqs then
         for k in adaptive.IterSet(reqs) do
-            if not RequiredTypes[k] then
-                GatherRequiredTypes(k)
+            if not required_types[k] then
+                AuxGatherRequiredTypes(required_types, k)
             end
         end
     end
+end
+
+local function AuxIterRequiredTypes_Keep (types, k)
+	k = next(types, k)
+
+	if k ~= nil then
+		return k
+	else 
+		RequiredTypeCache[#RequiredTypeCache + 1] = types
+	end
+end
+
+local function AuxIterRequiredTypes_Wipe (types, k)
+	k = next(types, k)
+
+	if k ~= nil then
+		types[k] = nil
+
+		return k
+	else 
+		RequiredTypeCache[#RequiredTypeCache + 1] = types
+	end
+end
+
+local function RequiredTypes (ctype, how) -- n.b. set up by CanAddToObject()
+	local required_types = remove(RequiredTypeCache) or {}
+
+	if how ~= "reuse" then -- reusing already-gathered result?
+		AuxGatherRequiredTypes(required_types, ctype)
+	end
+
+	return how == "keep" and AuxIterRequiredTypes_Keep or AuxIterRequiredTypes_Wipe, required_types, nil
 end
 
 local Lists = meta.Weak("k")
@@ -76,11 +112,9 @@ function M.AddToObject (object, ctype)
     local can_add = _CanAddToObject_(object, ctype)
 
     if _CanAddToObject_(object, ctype) then
-        GatherRequiredTypes(ctype) -- n.b. set up by CanAddToObject()
-
         local list = Lists[object]
 
-        for rtype in pairs(RequiredTypes) do
+        for rtype in RequiredTypes(ctype) do
             local info = Types[rtype]
             local on_add = info and info.add
 
@@ -88,7 +122,7 @@ function M.AddToObject (object, ctype)
                 on_add(object, rtype)
             end
 
-            list, RequiredTypes[rtype] = adaptive.AddToSet(list, ctype)
+            list = adaptive.AddToSet(list, ctype)
         end
 
         Lists[object] = list
@@ -96,6 +130,8 @@ function M.AddToObject (object, ctype)
 
     return can_add
 end
+
+-- TODO: handle calling Lock, etc. from on_add, so those don't trounce 
 
 local function AllowedByCurrentList (list, object, ctype)
     for comp in adaptive.IterSet(list) do
@@ -298,10 +334,8 @@ function M.LockInObject (object, ctype)
     local locks = Locks[object] or {}
 
     if NotLocked(locks, ctype) then
-		GatherRequiredTypes(ctype) -- n.b. set up before component added
-
-		for rtype in pairs(RequiredTypes) do
-			locks[rtype], RequiredTypes[rtype] = Inf
+		for rtype in RequiredTypes(ctype) do
+			locks[rtype] = Inf
 		end
     end
 
@@ -317,51 +351,60 @@ function M.RefInObject (object, ctype)
     local locks = Locks[object] or {}
 	
 	if NotLocked(locks, ctype) then
-        GatherRequiredTypes(ctype) -- n.b. set up before component added
-
-        for rtype in pairs(RequiredTypes) do
-            locks[rtype], RequiredTypes[rtype] = (locks[rtype] or 0) + 1 -- if infinity, left as-is
+        for rtype in RequiredTypes(ctype) do
+            locks[rtype] = (locks[rtype] or 0) + 1 -- if infinity, left as-is
         end
     end
 
 	Locks[object] = locks
 end
 
-local Methods = { add = true, allow_add = true, remove = true }
+local Actions = { add = true, allow_add = true, remove = true }
+
+local function IsTable (_, object)
+	return type(object) == "table"
+end
 
 --- Register a new component type.
 -- @tparam ?|table|string As a string, the name of the component.
 --
 -- Otherwise, a table with one or more of the following:
 -- * **name**: The aforesaid name. (Required.)
+-- * **actions**: Table that may contain **add**, **allow\_add**, and **remove** functions. (Optional.)
 -- * **interfaces**: Array of interfaces implemented by this component. (Optional.)
--- * **methods**: Table that may contain **add**, **allow\_add**, and **remove** functions. (Optional.)
 -- * **requires**: Array of component types that an object must also contain in order to have
 -- this component. These need not have been registered yet. (Optional.)
+-- @return Name, as a convenience.
 -- @see AddToObject, CanAddToObject, RemoveFromObject
 function M.RegisterType (params)
-    local ptype, name, interfaces, methods, requires = type(params)
+    local ptype, name, actions, interfaces, requires = type(params)
 
     if ptype == "string" then
         name = params
     else
         assert(ptype == "table", "Expected string or table params")
 
-        name, interfaces, methods, requires = params.name, params.interfaces, params.methods, params.requires
+        name, actions, interfaces, requires = params.name, params.actions, params.interfaces, params.requires
     end
 
     assert(name ~= nil, "Expected component name")
 
-    if interfaces or methods or requires then
+    if actions or interfaces or requires then
 		assert(Types[name] == nil, "Name already in use")
-        assert(methods == nil or type(methods) == "table", "Invalid methods")
+        assert(actions == nil or type(actions) == "table", "Invalid actions")
 
         local ctype = {}
 
-        for k, v in adaptive.IterSet(methods) do
-            assert(Methods[k], "Unsupported method")
+        for k, v in adaptive.IterSet(actions) do
+            assert(Actions[k], "Unsupported action")
 
-            ctype[k] = v
+			if rawequal(v, "is_table") then
+				assert(k == "allow_add", "Predicate only used on `allow_add` action")
+
+				ctype[v] = IsTable
+			else
+				ctype[k] = v
+			end
         end
 
         local reqs
@@ -385,6 +428,8 @@ function M.RegisterType (params)
 
         Types[name] = false
     end
+
+	return name
 end
 
 local function AuxRemove (object, comp)
@@ -496,18 +541,16 @@ function M.UnrefInObject (object, ctype)
     local locks = Locks[object]
 
 	if locks and NotLocked(locks, ctype) then
-        GatherRequiredTypes(ctype) -- n.b. set up before component added
-
-		for rtype in pairs(RequiredTypes) do -- detect improper usage, e.g. unref'ing required type directly
+		for rtype in RequiredTypes(ctype, "keep") do -- detect improper usage, e.g. unref'ing required type directly, keeping results around
 			if not locks[rtype] then
 				assert(false, "Bad ref count for component: " .. tostring(rtype))
 			end
 		end
 
-        for rtype in pairs(RequiredTypes) do
+        for rtype in RequiredTypes(ctype, "reuse") do -- use validated results from previous loop, wiping them along the way
 			local new_count = locks[rtype] - 1 -- if infinity, left as-is
 
-            locks[rtype], RequiredTypes[rtype] = new_count > 0 and new_count
+            locks[rtype] = new_count > 0 and new_count
         end
     end
 
