@@ -214,6 +214,31 @@ function M.CanAddToObject (object, ctype)
     return true
 end
 
+--- Get the list of interfaces implemented by a component.
+-- @param ctype
+-- @tparam[opt] table out If provided, this will be populated and used as the return value.
+--
+-- The final size will be trimmed down to the number of interfaces, if necessary.
+-- @treturn {Interface,...} Array of interfaces.
+-- @see GetInterfacesForObject, Implements, RegisterType
+function M.GetInterfacesForComponent (ctype, out)
+    out = out or {}
+
+    local info, n = Types[ctype], 0
+
+    assert(info ~= nil, "Type not registered")
+
+	for i = 1, #(info or "") do
+		out[n + 1], n = info[i], n + 1
+	end
+
+    for i = #out, n + 1, -1 do
+        out[i] = nil
+    end
+
+    return out
+end
+
 --- Get the list of interfaces implemented by an object's components.
 -- @param object
 -- @tparam[opt] table out If provided, this will be populated and used as the return value.
@@ -312,6 +337,13 @@ function M.ImplementedByObject (object, what)
     end
 
     return false
+end
+
+---
+-- @param ctype Component type.
+-- @treturn boolean Has _ctype_ been registered?
+function M.IsRegistered (ctype)
+	return Types[ctype] ~= nil
 end
 
 local Locks = meta.Weak("k")
