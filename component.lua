@@ -214,6 +214,20 @@ function M.CanAddToObject (object, ctype)
     return true
 end
 
+---
+-- @param object
+-- @param ctype Component type.
+-- @treturn boolean Does _ctype_ belong to _object_?
+function M.FoundInObject (object, ctype)
+    for comp in adaptive.IterSet(Lists[object]) do
+        if rawequal(comp, ctype) then
+            return true
+        end
+    end
+
+    return false
+end
+
 --- Get the list of interfaces implemented by a component.
 -- @param ctype
 -- @tparam[opt] table out If provided, this will be populated and used as the return value.
@@ -289,20 +303,6 @@ function M.GetListForObject (object, out)
     end
 
     return out
-end
-
----
--- @param object
--- @param ctype Component type.
--- @treturn boolean Does _ctype_ belong to _object_?
-function M.FoundInObject (object, ctype)
-    for comp in adaptive.IterSet(Lists[object]) do
-        if rawequal(comp, ctype) then
-            return true
-        end
-    end
-
-    return false
 end
 
 local function AuxImplements (info, what)
