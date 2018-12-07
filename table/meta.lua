@@ -95,7 +95,7 @@ function M.Augment (object, extension)
 				local prop = rprops[k]
 
 				if prop then
-					local what, res = prop(t)
+					local what, res = prop(t, k)
 
 					if what == "use_index_k" then
 						k = res
@@ -139,7 +139,7 @@ function M.Augment (object, extension)
 				local prop = wprops[k]
 
 				if prop then
-					local what, res1, res2 = prop(t, v)
+					local what, res1, res2 = prop(t, v, k)
 
 					if what == "use_newindex_k" then
 						k = res1
