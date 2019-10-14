@@ -31,23 +31,29 @@ local format = string.format
 local getmetatable = getmetatable
 local newproxy = newproxy
 local pairs = pairs
+local pcall = pcall
 local setmetatable = setmetatable
 local tostring = tostring
 local type = type
 
 -- Modules --
-local exception = require("tektite_core.exception")
 local table_meta = require("tektite_core.table.meta")
 local table_funcs = require("tektite_core.table.funcs")
 local var_preds = require("tektite_core.var.predicates")
 
 -- Imports --
 local IsCallable = var_preds.IsCallable
-local Try_Multi = exception.Try_Multi
 
 -- Cached module references --
 local _IsInstance_
 local _IsType_
+
+-- Exports --
+local M = {}
+
+--
+--
+--
 
 -- Instance / type mappings --
 local Instances = table_meta.Weak("k")
@@ -66,9 +72,6 @@ local Metamethods = table_funcs.MakeSet{
 	"__mod", "__pow", "__unm",
 	"__call", "__concat", "__gc", "__len"
 }
-
--- Exports --
-local M = {}
 
 -- Linearization heads, i.e. the classes themselves --
 local Heads = table_meta.Weak("v")
@@ -460,17 +463,10 @@ do
 		assert(type(I) == "table" or type(I) == "userdata", "Bad instance allocation")
 		assert(Instances[I] == nil, "Instance already exists")
 
-		ConsStack[top] = I
-
-		Instances[I] = ctype
+		ConsStack[top], Instances[I] = I, ctype
 
 		-- Invoke the constructor.
 		cons(I, ...)
-	end
-
-	-- Construct done
-	local function ConsDone (top)
-		ConsStack[top] = nil
 	end
 
 	--- Clones a class instance.
@@ -487,20 +483,30 @@ do
 			error(format("class.Clone: Type \"%s\" does not support cloning", tostring(ctype)))
 		end
 
-		local CI = type_info.alloc(type_info.meta)
+		local CI, top = type_info.alloc(type_info.meta), #ConsStack + 1
+		local ok, err = pcall(Cons, top, clone, CI, ctype, I, ...)
 
-		Try_Multi(Cons, ConsDone, #ConsStack + 1, clone, CI, ctype, I, ...)
+		ConsStack[top] = nil
 
-		return CI
+		if ok then
+			return CI
+		else
+			error(err)
+		end
 	end
 
 	-- Instantiates a class
 	function AuxNew (type_info, ...)
-		local I = type_info.alloc(type_info.meta)
+		local I, top = type_info.alloc(type_info.meta), #ConsStack + 1
+		local ok, err = pcall(Cons, top, type_info.cons, I, Heads[type_info.id], ...)
 
-		Try_Multi(Cons, ConsDone, #ConsStack + 1, type_info.cons, I, Heads[type_info.id], ...)
+		ConsStack[top] = nil
 
-		return I
+		if ok then
+			return I
+		else
+			error(err)
+		end
 	end
 end
 
@@ -525,9 +531,7 @@ function M.Type (item)
 	end
 end
 
--- Cache module members.
 _IsInstance_ = M.IsInstance
 _IsType_ = M.IsType
 
--- Export the module.
 return M
