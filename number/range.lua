@@ -34,6 +34,10 @@ local _MinMax_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Clamps a number between two bounds.
 --
 -- The bounds are swapped if out of order.
@@ -106,8 +110,6 @@ function M.RoundTo (n, inc)
 	return floor(n / inc + .5) * inc
 end
 
--- Cache module members.
 _MinMax_ = M.MinMax
 
--- Export the module.
 return M

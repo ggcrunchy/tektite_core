@@ -45,6 +45,10 @@ local bor
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Index loop when index sums exceed 256 --
 local MT = {
 	__index = function(t, i)
@@ -362,5 +366,4 @@ do
 	end
 end
 
--- Export the module.
 return M

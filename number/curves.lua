@@ -34,6 +34,10 @@ local sqrt = math.sqrt
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Computes a figure 8 displacement.
 --
 -- The underlying curve is a [Lissajous figure](http://en.wikipedia.org/wiki/Lissajous_figure)
@@ -179,5 +183,4 @@ function M.UnitTangent (curve, t, dt)
 	return dx / len, dy / len
 end
 
--- Export the module.
 return M

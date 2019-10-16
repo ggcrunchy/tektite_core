@@ -37,6 +37,10 @@ local IsCallable = var_preds.IsCallable
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- No key to get: no-op
 local function NoKey () end
 
@@ -86,5 +90,4 @@ function M.Proxy (on_no_setter)
 	end
 end
 
--- Export the module.
 return M

@@ -43,6 +43,10 @@ local IsCallable = var_preds.IsCallable
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- --
 local Registered = setmetatable({}, { __mode = "kv" })
 
@@ -103,5 +107,4 @@ function M.WithBoundTable (t, func, ...)
 	return res_, res2
 end
 
--- Export the module.
 return M

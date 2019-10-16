@@ -36,6 +36,10 @@ local StoreTraceback = errors.StoreTraceback
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Performs a call and cleans up afterward. If an error occurs during the call, the
 -- cleanup is still performed, and the error propagated.
 --
@@ -82,5 +86,4 @@ function M.Try_Multi (func, finally, resource, ...)
 	return result_
 end
 
--- Export the module.
 return M

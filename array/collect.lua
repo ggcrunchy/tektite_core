@@ -32,6 +32,10 @@ local unpack = unpack
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- A standard append, based on Collect's analysis.
 local function Append (acc, i, count, v1, v2, v3, v4, v5, ...)
 	if i <= count then
@@ -150,5 +154,4 @@ function M.UnpackOrGet (var, key, how)
 	end
 end
 
--- Export the module.
 return M

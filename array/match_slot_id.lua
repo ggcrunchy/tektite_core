@@ -47,6 +47,10 @@ local RotateIndex = index_funcs.RotateIndex
 local M = {}
 
 --
+--
+--
+
+--
 local function NextID (id, n, arr)
 	if n then
 		return RotateIndex(id, n == "size" and #arr or n)
@@ -203,5 +207,4 @@ function M.Wrap (arr, n)
 	end, arr
 end
 
--- Export the module.
 return M

@@ -187,8 +187,6 @@ function M.Weak (choice)
 	return setmetatable({}, assert(Choices[choice], "Invalid weak option"))
 end
 
--- Cache module members.
 _Weak_ = M.Weak
 
--- Export the module.
 return M

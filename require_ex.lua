@@ -35,6 +35,10 @@ local type = type
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Helper logic for DoList and GetNames
 local function AuxDo (from, list, action, categories, base_prefix, names_as_keys, acc, splice)
 	local category, prefix, n, res = from._category, from._prefix or base_prefix, splice and #list
@@ -195,5 +199,4 @@ function M.Lazy (name)
 	return proxy
 end
 
--- Export the module.
 return M

@@ -32,6 +32,10 @@ local _WipeRange_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Helper for nil array argument --
 local Empty = {}
 
@@ -76,8 +80,6 @@ function M.WipeRange (array, first, last, wipe)
 	return array
 end
 
--- Cache module members.
 _WipeRange_ = M.WipeRange
 
--- Export the module.
 return M

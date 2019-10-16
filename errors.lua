@@ -35,6 +35,10 @@ local IsCallable = var_preds.IsCallable
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Last traceback --
 local LastTraceback
 
@@ -74,5 +78,4 @@ function M.StoreTraceback (...)
 	LastTraceback = (TracebackFunc or DefaultTraceback)(...)
 end
 
--- Export the module.
 return M

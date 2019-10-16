@@ -30,6 +30,10 @@ local reverse = string.reverse
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- --
 local Acc
 
@@ -77,5 +81,4 @@ function M.Binary (n, block_size, pad)
 	end
 end
 
--- Export the module.
 return M

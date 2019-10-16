@@ -35,6 +35,10 @@ local _Push_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Index of head, when buffer is full (to distinguish from empty condition) --
 local Full = -1
 
@@ -168,10 +172,8 @@ function M.Push_Guarded (arr, elem, head, tail, len)
 	return head ~= new_head, new_head, new_tail
 end
 
--- Cache module members.
 _IsEmpty_ = M.IsEmpty
 _IsFull_ = M.IsFull
 _Push_ = M.Push
 
--- Export the module.
 return M

@@ -48,6 +48,10 @@ local SubTablesOnDemand = lazy.SubTablesOnDemand
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Default output function --
 local DefaultOutf
 
@@ -254,5 +258,4 @@ function M.SetDefaultOutf (outf)
 	DefaultOutf = outf
 end
 
--- Export the module.
 return M

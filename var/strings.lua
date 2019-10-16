@@ -39,6 +39,10 @@ local _EndsWith_AnyCase_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Adds an extension to a string, as _str_._ext_, e.g. for filenames.
 --
 -- If _str_ already has the dot and extension, this is a no-op.
@@ -218,8 +222,6 @@ function M.SplitIntoWords (str, how, opts)
 	return str
 end
 
--- Cache module members.
 _EndsWith_AnyCase_ = M.EndsWith_AnyCase
 
--- Export the module.
 return M

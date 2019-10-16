@@ -30,10 +30,16 @@ local remove = table.remove
 local sort = table.sort
 
 -- Cached module references --
-local _GetAdjacentTriangle_Tri_, _GetIndices_, _GetVertexPos_
+local _GetAdjacentTriangle_Tri_
+local _GetIndices_
+local _GetVertexPos_
 
 -- Exports --
 local M = {}
+
+--
+--
+--
 
 --- DOCME
 function M.AddVertex (mesh, x, y)
@@ -296,10 +302,8 @@ function M.RemoveTriangle (mesh, tri)
 	end
 end
 
--- Cache module members.
 _GetAdjacentTriangle_Tri_ = M.GetAdjacentTriangle_Tri
 _GetIndices_ = M.GetIndices
 _GetVertexPos_ = M.GetVertexPos
 
--- Export the module.
 return M

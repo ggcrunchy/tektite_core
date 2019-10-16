@@ -29,6 +29,10 @@ local abs = math.abs
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Length via quadrature
 do
 	-- Quadrature offsets and weights --
@@ -137,5 +141,4 @@ do
 	end
 end
 
--- Export the module.
 return M

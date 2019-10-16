@@ -589,9 +589,7 @@ function M.UnrefInObject (object, ctype)
 	Locks[object] = locks
 end
 
--- Cache module members.
 _CanAddToObject_ = M.CanAddToObject
 _RemoveFromObject_ = M.RemoveFromObject
 
--- Export the module.
 return M

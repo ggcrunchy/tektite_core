@@ -38,6 +38,10 @@ local IsNaN = var_preds.IsNaN
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Equality helper
 local function AuxEqual (t1, t2)
 	-- Iterate the tables in parallel. If equal, both tables will run out on the same
@@ -88,5 +92,4 @@ function M.Equal (t1, t2)
 	return AuxEqual(t1, t2)
 end
 
--- Export the module.
 return M

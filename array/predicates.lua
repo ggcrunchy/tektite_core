@@ -26,6 +26,10 @@
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Iterates from _i_ = 1 to _count_ and reports whether **all** `arr[i]` are true.
 -- @array arr Array to test.
 -- @uint[opt=#arr] count Number of tests to perform.
@@ -93,5 +97,4 @@ function M.Some (arr, count)
 	return n > 0 and n < count
 end
 
--- Export the module.
 return M

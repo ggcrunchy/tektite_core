@@ -49,6 +49,10 @@ local _Lookup_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Find the first sample corresponding to a parameter
 local function AuxLookup (samples, n, x, start) -- n as argument to unify streamline the initialization assert
 	assert(n > 0, "Empty sample set")
@@ -293,9 +297,7 @@ function M.UpdateSample (samples, index, x, y)
 	end
 end
 
--- Cache module members.
 _GetCount_ = M.GetCount
 _Lookup_ = M.Lookup
 
--- Export the module.
 return M

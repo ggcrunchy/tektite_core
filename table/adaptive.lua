@@ -54,6 +54,10 @@ local _SimplifySet_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Adds an element to an adaptive set.
 -- @tparam AdaptiveSet set
 -- @param v Value to add; **nil** is ignored.
@@ -303,7 +307,6 @@ function M.SimplifySet_Member (t, k)
 	t[k] = _SimplifySet_(t[k])
 end
 
--- Cache module members.
 _AddToSet_ = M.AddToSet
 _Append_ = M.Append
 _RemoveFromArray_ = M.RemoveFromArray
@@ -311,5 +314,4 @@ _RemoveFromSet_ = M.RemoveFromSet
 _SimplifyArray_ = M.SimplifyArray
 _SimplifySet_ = M.SimplifySet
 
--- Export the module.
 return M

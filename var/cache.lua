@@ -43,6 +43,10 @@ local WipeRange = wipe.WipeRange
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Building block for cached types.
 --
 -- The principal motivation behind this mechanism is that for certain types, some of the
@@ -334,5 +338,4 @@ function M.TableCache (on_restore)
 	end
 end
 
--- Export the module.
 return M

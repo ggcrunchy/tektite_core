@@ -46,6 +46,10 @@ local _IsIndexValid_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- DOCME
 -- @uint index
 -- @uint start
@@ -166,8 +170,6 @@ function M.IsIndexValid (index, size, add_spot)
 	return index > 0 and IndexInRange(index, size, add_spot)
 end
 
--- Cache module members.
 _IsIndexValid_ = M.IsIndexValid
 
--- Export the module.
 return M

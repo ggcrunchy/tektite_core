@@ -34,6 +34,10 @@ local _SinOverX_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- TODO: Specialize for complex numbers, vectors?
 
 --- DOCME
@@ -63,8 +67,6 @@ function M.SlerpCoeffs (t, theta)
 	return _SinOverX_(s * theta) * s / denom, _SinOverX_(t * theta) * t / denom
 end
 
--- Cache module members.
 _SinOverX_ = M.SinOverX
 
--- Export the module.
 return M

@@ -34,6 +34,10 @@ local type = type
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @uint[opt] free
@@ -88,5 +92,4 @@ function M.RemoveAt (arr, index, free)
 	return free
 end
 
--- Export the module.
 return M

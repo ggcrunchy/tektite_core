@@ -32,6 +32,10 @@ local sqrt = math.sqrt
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Getter.
 -- @number px Point #1, x-coordinate...
 -- @number py ...and y-axis.
@@ -97,5 +101,4 @@ function M.ToBin_RoundUpMin (dx, dy, len, base, bias)
 	return max(base or 0, AuxQuantize(ceil, dx, dy, len, bias))
 end
 
--- Export the module.
 return M

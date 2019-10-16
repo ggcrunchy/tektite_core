@@ -40,6 +40,10 @@ local _PosToCell_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Gets the index of a grid cell when that grid is considered as a flat array.
 -- @int col Column index.
 -- @int row Row index.
@@ -203,7 +207,6 @@ function M.PosToCell_Func (w, h)
 	end
 end
 
--- Cache module members.
 _CellToIndex_ = M.CellToIndex
 _IndexToCell_ = M.IndexToCell
 _PosToCell_ = M.PosToCell
@@ -378,5 +381,4 @@ function M.NewStencil (dim)
 end
 --]=]
 
--- Export the module.
 return M

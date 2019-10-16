@@ -41,6 +41,10 @@ local _MakeOnDemand_Meta_Nullary_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 -- Bound table getter --
 local GetTable
 
@@ -181,9 +185,7 @@ end
 -- Register bound-table functions.
 GetTable = bound_args.Register{ M.SubTablesOnDemand }
 
--- Cache module members.
 _MakeOnDemand_Meta_ = M.MakeOnDemand_Meta
 _MakeOnDemand_Meta_Nullary_ = M.MakeOnDemand_Meta_Nullary
 
--- Export the module.
 return M

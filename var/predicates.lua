@@ -51,6 +51,10 @@ local _IsIndexableR_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Predicate.
 -- @param var Variable to test.
 -- @param name Field name.
@@ -148,9 +152,7 @@ function M.IsNaN (var)
 	return var ~= var
 end
 
--- Cache module members.
 _HasMeta_ = M.HasMeta
 _IsIndexableR_ = M.IsIndexableR
 
--- Export the module.
 return M

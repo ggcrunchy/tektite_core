@@ -30,6 +30,10 @@ local log = math.log
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Breaks the result of _a_ / _b_ up into a count and remainder.
 -- @number a Dividend.
 -- @number b Divisor.
@@ -88,5 +92,4 @@ function M.GenerateUnsignedConstants (nmax, d, compose)
 	end
 end
 
--- Export the module.
 return M

@@ -33,6 +33,10 @@ local _BoxesIntersect_
 -- Exports --
 local M = {}
 
+--
+--
+--
+
 --- Predicate.
 -- @number x1 Box #1 x-coordinate...
 -- @number y1 ...y-coordinate...
@@ -97,8 +101,6 @@ function M.PointInBox (px, py, x, y, w, h)
 	return px >= x and px < x + w and py >= y and py < y + h
 end
 
--- Cache module members.
 _BoxesIntersect_ = M.BoxesIntersect
 
--- Export the module.
 return M
