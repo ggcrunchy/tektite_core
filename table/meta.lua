@@ -170,7 +170,6 @@ function M.Augment (object, extension)
 	end
 end
 
--- Weak table choices --
 local Choices = { "k", "v", "kv" }
 
 for i, mode in ipairs(Choices) do
