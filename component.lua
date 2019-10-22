@@ -99,7 +99,7 @@ local function RequiredTypes (ctype, how) -- n.b. set up by CanAddToObject()
 	return how == "keep" and AuxIterRequiredTypes_Keep or AuxIterRequiredTypes_Wipe, required_types, nil
 end
 
-local Lists = meta.Weak("k")
+local Lists = meta.WeakKeyed()
 
 --- Add a component to an object.
 --
@@ -111,7 +111,7 @@ local Lists = meta.Weak("k")
 function M.AddToObject (object, ctype)
     local can_add = _CanAddToObject_(object, ctype)
 
-    if _CanAddToObject_(object, ctype) then
+    if can_add then
         local list = Lists[object]
 
         for rtype in RequiredTypes(ctype) do
@@ -346,7 +346,7 @@ function M.IsRegistered (ctype)
 	return Types[ctype] ~= nil
 end
 
-local Locks = meta.Weak("k")
+local Locks = meta.WeakKeyed()
 
 local Inf = 1 / 0
 

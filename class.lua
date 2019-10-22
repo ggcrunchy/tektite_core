@@ -56,10 +56,10 @@ local M = {}
 --
 
 -- Instance / type mappings --
-local Instances = table_meta.Weak("k")
+local Instances = table_meta.WeakKeyed()
 
 -- Class definitions --
-local Defs = table_meta.Weak("k")
+local Defs = table_meta.WeakKeyed()
 
 -- Built-in type set --
 local BuiltIn = table_funcs.MakeSet{ "boolean", "function", "nil", "number", "string", "table", "thread", "userdata" }
@@ -74,7 +74,7 @@ local Metamethods = table_funcs.MakeSet{
 }
 
 -- Linearization heads, i.e. the classes themselves --
-local Heads = table_meta.Weak("v")
+local Heads = table_meta.WeakValued()
 
 -- Weak-mode, __index'd table
 local function WeakIndexed (ifunc)
@@ -149,7 +149,7 @@ do
 	end)
 
 	-- Per-instance data for default allocations --
-	local InstanceData = table_meta.Weak("k")
+	local InstanceData = table_meta.WeakKeyed()
 
 	-- Default instance allocator
 	local function DefaultAlloc (meta)
