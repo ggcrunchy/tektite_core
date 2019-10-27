@@ -24,21 +24,13 @@
 --
 
 -- Standard library imports --
+local assert = assert
 local ipairs = ipairs
 local pairs = pairs
 local sort = table.sort
 
 -- Modules --
-local bound_args = require("tektite_core.var.bound_args")
-local collect = require("tektite_core.array.collect")
 local wipe = require("tektite_core.array.wipe")
-
--- Imports --
-local CollectArgsInto = collect.CollectArgsInto
-local WipeRange = wipe.WipeRange
-
--- Cached module references --
-local _Backfill_
 
 -- Exports --
 local M = {}
@@ -47,17 +39,20 @@ local M = {}
 --
 --
 
--- Bound table getter --
-local GetTable
+local function CheckOpts (opts)
+	assert(opts == nil or type(opts) == "table", "Invalid options")
+
+	return opts and opts.out or {}
+end
 
 --- Builds a new array with _count_ elements, each of which is a table.
 --
 -- When called in a bound table context, the binding is used as the destination array.
 -- @uint count
+-- @ptable[opt] opts TODO!
 -- @treturn array Array.
--- @see tektite_core.var.bound_args.WithBoundTable
-function M.ArrayOfTables (count)
-	local dt = GetTable()
+function M.ArrayOfTables (count, opts)
+	local dt = CheckOpts(opts)
 
 	for i = 1, count do
 		dt[i] = {}
@@ -111,38 +106,20 @@ function M.Filter (arr, func, arg, clear_dead)
 	end
 
 	-- Wipe dead entries or place a sentinel nil.
-	WipeRange(arr, kept + 1, clear_dead and size or kept + 1)
+	wipe.WipeRange(arr, kept + 1, clear_dead and size or kept + 1)
 
 	-- Report the new size.
 	return kept
-end
-
--- Gets multiple table fields
--- ...: Fields to get
--- Returns: Values, in order
------------------------------- DOCMEMORE
-function M.GetFields (t, ...)
-	local count, dt = CollectArgsInto(GetTable(), ...)
-
-	for i = 1, count do
-		local key = keys[i]
-
-		assert(key ~= nil, "Nil table key")
-
-		keys[i] = t[key]
-	end
-
-	return dt
 end
 
 --- Collects all keys, arbitrarily ordered, into an array.
 --
 -- When called in a bound table context, the binding is used as the destination array.
 -- @array arr Array from which to read keys.
+-- @ptable[opt] opts TODO!
 -- @treturn table Key array.
--- @see tektite_core.var.bound_args.WithBoundTable
-function M.GetKeys (arr)
-    local dt = GetTable()
+function M.GetKeys (arr, opts)
+    local dt = CheckOpts(opts)
 
 	for k in pairs(arr) do
 		dt[#dt + 1] = k
@@ -183,8 +160,5 @@ function M.Reverse (arr, count)
 		j = j - 1
 	end
 end
-
--- Register bound-table functions.
-GetTable = bound_args.Register{ M.ArrayOfTables, M.GetFields, M.GetKeys }
 
 return M
