@@ -27,7 +27,7 @@
 local assert = assert
 local ipairs = ipairs
 local pairs = pairs
-local sort = table.sort
+local type = type
 
 -- Modules --
 local wipe = require("tektite_core.array.wipe")
@@ -128,22 +128,29 @@ function M.GetKeys (arr, opts)
 	return dt
 end
 
+local Visited = {}
+
+local NaNKey = Visited
+
 --- DOCME
-function M.RemoveDups (arr, comp)
-	sort(arr, comp)
+function M.RemoveDups (arr)
+	local n, wpos, had_nan = #arr, 0
 
-	--
-	local n, prev = #arr
-
-	for i = n, 1, -1 do
+	for i = 1, n do
 		local cur = arr[i]
+		local key = cur ~= cur and NaNKey or cur
 
-		if cur == prev then
-			arr[i] = arr[n]
-			n, arr[n] = n - 1
-		else
-			prev = cur
+		if not Visited[key] then
+			arr[wpos + 1], wpos, Visited[key] = cur, wpos + 1, true
 		end
+	end
+
+	for i = n, wpos + 1, -1 do
+		arr[i] = nil
+	end
+
+	for k in pairs(Visited) do
+		Visited[k] = nil
 	end
 end
 
