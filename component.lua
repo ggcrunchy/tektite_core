@@ -122,7 +122,7 @@ function M.AddToObject (object, ctype)
                 on_add(object, rtype)
             end
 
-            list = adaptive.AddToSet(list, ctype)
+            list = adaptive.AddToSet(list, rtype)
         end
 
         Lists[object] = list
@@ -418,7 +418,7 @@ function M.RegisterType (params)
 
         name, actions, interfaces, requires = params.name, params.actions, params.interfaces, params.requires
     end
-
+print("?",name,interfaces)
     assert(name ~= nil, "Expected component name")
 
     if actions or interfaces or requires then
@@ -448,8 +448,9 @@ function M.RegisterType (params)
 
         ctype.requirement_list = reqs -- put any requirements here for now, but resolve on first use
 
-        for i, name in adaptive.IterArray(interfaces) do
-            ctype[i] = name
+        for i, ifx in adaptive.IterArray(interfaces) do
+print("???",i,ifx)
+            ctype[i] = ifx
         end
 
         array_funcs.RemoveDups(ctype)
@@ -460,7 +461,7 @@ function M.RegisterType (params)
 
         Types[name] = false
     end
-
+print("")
 	return name
 end
 
