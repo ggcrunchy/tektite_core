@@ -80,6 +80,175 @@ end
 -- --
 local Neighbors = {}
 
+do
+	-- vertex index = 1 through N
+	-- vertex index list = empty or { vertex index; vertex index list VList }
+	-- edge list = empty or { edge e; edge list EList }
+	-- triangle list = empty or { tri t; triangle list TList }
+	-- vertex = { vertex index; edge list Elist; triangle list TList } -> { uint, edges = {edge...}, tris = {tri...} }
+	-- edge = { vertex index v[2]; triangle list TList } -> { uint1, uint2, tri1[, tri2] }
+	-- tri = { vertex index list VList } -> { uint1, uint2, uint3 }
+
+	-- add vertex:
+		-- new index
+		-- locate triangle, if any
+			-- if on edge
+				-- ???
+			-- if in tri
+				-- split up!
+			-- else
+				-- err...
+
+		-- remove vertex:
+			-- try to merge neighbors
+
+	-- Adapted from "Geometric Tools for Computer Graphics"
+
+	local TriStack = {}
+
+	local function FindEdge (vertices, i1, i2)
+		local vertex = vertices[i1]
+
+		for _, edge in ipairs(vertex.edges) do
+			local e1, e2 = edge[1], edge[2]
+
+			if (e1 == i1 and e2 == i2) or (e1 == i2 and e2 == i1) then
+				return edge
+			end
+		end
+	end
+
+	local function VisitEdgesInStack (mesh, func, get, acc)
+		local vertices = mesh.vertices
+
+		repeat
+			local tri = get(acc)
+			local i1, i2, i3 = tri[1], tri[2], tri[3]
+
+			func(FindEdge(vertices, i1, i2), tri)
+			func(FindEdge(vertices, i2, i3), tri)
+			func(FindEdge(vertices, i3, i1), tri)
+		until #TriStack == 0
+	end
+
+	local GenerationID = 0
+
+	local function IsUnvisited (tri)
+		return tri and tri.gen_id ~= GenerationID
+	end
+
+	local function PushTriangle (tri)
+		TriStack[#TriStack + 1], tri.gen_id = tri, GenerationID
+	end
+
+	local function PushAdjacentTriangles (edge)
+		for i = 3, 4 do
+			local tri = edge[i]
+
+			if IsUnvisited(tri) then
+				PushTriangle(tri)
+			end
+		end
+	end
+
+	local function GetUnvisitedTriangle (mesh)
+		local tris = mesh.triangles
+
+		for i = mesh.index + 1, #tris do
+			local tri = tris[i]
+
+			if IsUnvisited(tri) then
+				return tri, i
+			end
+		end
+	end
+
+	local function PushUnvisitedTriangle (mesh)
+		local tri, index = GetUnvisitedTriangle(mesh)
+
+		if tri then
+			PushTriangle(tri)
+
+			mesh.index = index
+
+			return true
+		end
+	end
+
+	local function PopTriangle ()
+		return remove(TriStack)
+	end
+
+	local function PopAndAccumulateTriangle (acc)
+		local tri = PopTriangle()
+
+		acc[#acc+ 1] = tri
+
+		return tri
+	end
+
+	local function Prepare (mesh)
+		mesh.index, GenerationID = 0, GenerationID + 1
+	end
+
+	--- DOCME
+	function M.GetComponents (mesh)
+		local list, n = {}, 0
+
+		Prepare(mesh)
+
+		while PushUnvisitedTriangle(mesh) do
+			list[n + 1], n = {}, n + 1
+
+			VisitEdgesInStack(mesh, PushAdjacentTriangles, PopAndAccumulateTriangle, list[n])
+		end
+
+		return list
+	end
+
+	--- DOCME
+	function M.IsConnected (mesh)
+		Prepare(mesh)
+		PushUnvisitedTriangle(mesh)
+		VisitEdgesInStack(mesh, PushAdjacentTriangles, PopTriangle)
+
+		return not GetUnvisitedTriangle(mesh)
+	end
+
+	local function ContainsOrderedEdge (tri, vi1, vi2)
+		local i1, i2, i3 = tri[1], tri[2], tri[3]
+
+		return (i1 == vi1 and i2 == vi2) or (i2 == vi1 and i3 == vi2) or (i3 == vi1 and i1 == vi2)
+	end
+
+	local function ReorderVertices (tri)
+		tri[1], tri[2], tri[3] = tri[3], tri[2], tri[1]
+	end
+
+	local function TriangleAdjacentToEdge (tri, edge)
+		return edge[edge[4] == tri and 3 or 4]
+	end
+
+	local function AuxMakeConsistent (edge, tri)
+		local adjacent = TriangleAdjacentToEdge(tri, edge)
+
+		if IsUnvisited(adjacent) then
+			if ContainsOrderedEdge(adjacent, edge[1], edge[2]) then
+				ReorderVertices(adjacent)
+			end
+
+			PushTriangle(adjacent)
+		end
+	end
+
+	--- DOCME
+	function M.MakeConsistent (mesh)
+		Prepare(mesh)
+		PushUnvisitedTriangle(mesh)
+		VisitEdgesInStack(mesh, AuxMakeConsistent, PopTriangle)
+	end
+end
+
 --
 local function AddNeighbor (mesh, tri, index, cost)
 	local neighbor = _GetAdjacentTriangle_Tri_(mesh, tri, index)
