@@ -25,6 +25,7 @@
    
 -- Standard library imports --
 local abs = math.abs
+local ipairs = ipairs
 local pairs = pairs
 local remove = table.remove
 local sort = table.sort
@@ -80,15 +81,44 @@ end
 -- --
 local Neighbors = {}
 
+local Mesh = {}
+
 do
 	-- vertex index = 1 through N
 	-- vertex index list = empty or { vertex index; vertex index list VList }
 	-- edge list = empty or { edge e; edge list EList }
 	-- triangle list = empty or { tri t; triangle list TList }
-	-- vertex = { vertex index; edge list Elist; triangle list TList } -> { uint, edges = {edge...}, tris = {tri...} }
+	-- vertex = { vertex index; edge list Elist; triangle list TList } -> { uint, {edge...}, {tri...} }
 	-- edge = { vertex index v[2]; triangle list TList } -> { uint1, uint2, tri1[, tri2] }
 	-- tri = { vertex index list VList } -> { uint1, uint2, uint3 }
 
+local function AuxRemove (vertices, index, elem)
+	for i = 1, index do -- n.b. count and index coincide
+		local list = vertices[elem[i]][index] 
+		local n = #list
+
+		for j = 1, n do
+			if list[j] == elem then
+				list[j] = list[n]
+				list[n] = nil
+
+				break
+			end
+		end
+	end
+end
+
+local function RemoveTriangle (vertices, tri)
+	AuxRemove(vertices, 3, tri)
+end
+
+local function RemoveEdge (vertices, edge)
+	AuxRemove(vertices, 2, edge)
+
+	for i = 3, edge[4] and 4 or 3 do
+		RemoveTriangle(vertices, edge[i])
+	end
+end
 	-- add vertex:
 		-- new index
 		-- locate triangle, if any
@@ -106,13 +136,13 @@ do
 
 	local TriStack = {}
 
-	local function FindEdge (vertices, i1, i2)
-		local vertex = vertices[i1]
+	local function FindEdgeFromPair (vertices, i1, i2)
+		local vertex, isum = vertices[i1], i1 + i2
 
-		for _, edge in ipairs(vertex.edges) do
-			local e1, e2 = edge[1], edge[2]
+		for _, edge in ipairs(vertex[2]) do
+			local e1 = edge[1]
 
-			if (e1 == i1 and e2 == i2) or (e1 == i2 and e2 == i1) then
+			if isum == e1 + edge[2] and (i1 == e1 or i2 == e1) then
 				return edge
 			end
 		end
@@ -125,9 +155,9 @@ do
 			local tri = get(acc)
 			local i1, i2, i3 = tri[1], tri[2], tri[3]
 
-			func(FindEdge(vertices, i1, i2), tri)
-			func(FindEdge(vertices, i2, i3), tri)
-			func(FindEdge(vertices, i3, i1), tri)
+			func(FindEdgeFromPair(vertices, i1, i2), tri)
+			func(FindEdgeFromPair(vertices, i2, i3), tri)
+			func(FindEdgeFromPair(vertices, i3, i1), tri)
 		until #TriStack == 0
 	end
 
@@ -192,27 +222,27 @@ do
 	end
 
 	--- DOCME
-	function M.GetComponents (mesh)
+	function Mesh:GetComponents ()
 		local list, n = {}, 0
 
-		Prepare(mesh)
+		Prepare(self)
 
-		while PushUnvisitedTriangle(mesh) do
+		while PushUnvisitedTriangle(self) do
 			list[n + 1], n = {}, n + 1
 
-			VisitEdgesInStack(mesh, PushAdjacentTriangles, PopAndAccumulateTriangle, list[n])
+			VisitEdgesInStack(self, PushAdjacentTriangles, PopAndAccumulateTriangle, list[n])
 		end
 
 		return list
 	end
 
 	--- DOCME
-	function M.IsConnected (mesh)
-		Prepare(mesh)
-		PushUnvisitedTriangle(mesh)
-		VisitEdgesInStack(mesh, PushAdjacentTriangles, PopTriangle)
+	function Mesh:IsConnected ()
+		Prepare(self)
+		PushUnvisitedTriangle(self)
+		VisitEdgesInStack(self, PushAdjacentTriangles, PopTriangle)
 
-		return not GetUnvisitedTriangle(mesh)
+		return not GetUnvisitedTriangle(self)
 	end
 
 	local function ContainsOrderedEdge (tri, vi1, vi2)
@@ -242,10 +272,10 @@ do
 	end
 
 	--- DOCME
-	function M.MakeConsistent (mesh)
-		Prepare(mesh)
-		PushUnvisitedTriangle(mesh)
-		VisitEdgesInStack(mesh, AuxMakeConsistent, PopTriangle)
+	function Mesh:MakeConsistent ()
+		Prepare(self)
+		PushUnvisitedTriangle(self)
+		VisitEdgesInStack(self, AuxMakeConsistent, PopTriangle)
 	end
 end
 
