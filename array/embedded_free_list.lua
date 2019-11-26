@@ -1,6 +1,6 @@
 --- This module is motivated by the fact that, when an array's elements are required to be
--- non-numbers, said elements may be removed without disturbing the positions of elements
--- elsewhere in the array, by stuffing an integer into the vacated slot.
+-- non-numbers, an element may be removed&mdash;without disturbing the positions of elements
+-- elsewhere in the array&mdash;by stuffing an integer into the vacated slot.
 --
 -- Furthermore, these same integers can be used to maintain a free list, thus providing O(1)
 -- retrieval of free array slots.
@@ -40,7 +40,25 @@ local M = {}
 
 --- DOCME
 -- @array arr
--- @uint[opt] free
+-- @uint n
+-- @tparam ?|uint|nil free
+function M.Extend (arr, n, free)
+	if n > 0 then
+		local last = #arr
+
+		for i = last + 1, last + n - 1 do
+			arr[i] = i + 1
+		end
+
+		arr[last + n], free = free, last + 1
+	end
+
+	return free
+end
+
+--- DOCME
+-- @array arr
+-- @tparam ?|uint|nil free
 -- @treturn uint X
 -- @treturn uint F
 function M.GetInsertIndex (arr, free)
@@ -56,18 +74,15 @@ end
 -- @int index
 -- @treturn boolean B
 function M.InUse (arr, index)
-	-- Disregard non-array indices and invalid slots. To streamline the test, treat these
-	-- cases as though a number was found in the array part.
-	local elem = index > 0 and arr[index] or 0
+	local elem = index > 0 and arr[index] or 0 -- invalid indices coerced to number
 
-	-- The queue consists of numbers; conversely, non-numbers are in use.
 	return type(elem) ~= "number"
 end
 
 --- DOCME
 -- @array arr
 -- @int index
--- @uint free
+-- @tparam ?|uint|nil free
 -- @treturn uint X
 function M.RemoveAt (arr, index, free)
 	local n = #arr
@@ -76,9 +91,9 @@ function M.RemoveAt (arr, index, free)
 	if index == n then
 		n, arr[index] = n - 1
 
-		-- It may be possible to trim more: if the new final slot also happens to be the
-		-- head of the free list, it is known to not be in use. Trim the array until this
-		-- is no longer the case (which could mean the free list is empty).
+		-- If the new final slot also happens to be the head of the free list, it is clearly
+		-- not in use. Trim slots one at a time until this is no longer so, possibly emptying
+		-- the free list entirely.
 		while n > 0 and n == free do
 			free, n, arr[n] = arr[n], n - 1
 		end
