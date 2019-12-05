@@ -1,18 +1,15 @@
---- This module is motivated by the situation where an array must be ready to answer some
--- yes-or-no question about each of its elements. For example: is element X in use?
+--- Many arrays must answer some yes-or-no question about their elements, e.g. if a given
+-- one is currently active.
 --
--- It will usually be difficult to maintain the necessary state in the elements themselves.
--- It is quite common in the case of arrays, however, that the table's negative integer
--- indices go unused. When this is so, these may be commandeered to store the state; this
--- conveniently allows a boolean at index -_i_ to describe an element at index _i_.
+-- This might be cumbersome to manage via the elements themselves. Tables often forgo any
+-- negative integer indices, however, leaving them available for this sort of state. As an
+-- added benefit, index -_i_ can correspond to element #_i_.
 --
--- Obviously, this eliminates the need to track two tables. Furthermore, if the underlying
+-- This obviously eliminates the need to track two tables. Furthermore, if the underlying
 -- representation makes no difference to the user, an integer may be stored instead of an
--- explicit boolean. The element then has a "yes" if this integer matches some master ID.
+-- explicit boolean. A "yes" then boils down to its value matching some master ID.
 --
--- When this technique is used, setting all elements to "no" is an O(1) operation; one simply
--- changes the master ID. This is useful in various periodic patterns, such as per-frame and
--- per-timeout actions.
+-- Importantly, by assigning a fresh master ID, all elements become "no" in one fell swoop.
 
 --
 -- Permission is hereby granted, free of charge, to any person obtaining
@@ -37,12 +34,6 @@
 -- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 --
 
--- Modules --
-local index_funcs = require("tektite_core.array.index")
-
--- Imports --
-local RotateIndex = index_funcs.RotateIndex
-
 -- Exports --
 local M = {}
 
@@ -50,34 +41,32 @@ local M = {}
 --
 --
 
---
 local function NextID (id, n, arr)
-	if n then
-		return RotateIndex(id, n == "size" and #arr or n)
+	if n and id >= (n == "size" and #arr or n) then
+		return 1
 	else
 		return id + 1
 	end
 end
 
--- Helper to kick off a new generation
-local function AuxBeginGeneration (arr, key, n)
-	-- Update the master ID for the current generation and overwrite one slot with an invalid
-	-- ID (nil); for convenience, the index of this slot is the master ID's value. This is an
-	-- alternative to clearing all slots one by one: the master ID is new, and ipso facto no
-	-- slot has a match, therefore none remain "yes".
+local function AuxBeginGeneration (arr, id_key, n)
+	-- Update the master ID for the current generation and invalidate one slot, using the
+	-- master ID as slot index for convenience. This is an alternative to clearing all slots
+	-- one by one: since the master ID is new, no slots match, therefore none remain "yes".
 
-	-- When a slot is marked, it gets assigned the current value of the master ID. The ID is
-	-- implemented as a counter (mod n), where n is the array length. After n generations,
-	-- when the counter rolls back around to the same value, the overwrite will have been
-	-- applied to exactly n slots. Thus, there will not be any false "yes" positives on
-	-- account of dangling instances of the master ID in the array.
+	-- A slot is marked by assigning it the current master ID. The ID is implemented as a
+	-- counter (mod n), where n is the array length.
 
-	-- That said, if this is stock Lua or LuaJIT, say, where numbers are still doubles (or in
-	-- 5.3+, where integers are still 64-bit), much of this is a formality, given how very
-	-- long it would take to increment these to overflow.
-	local gen_id = NextID(arr[key] or 0, n, arr)
+	-- This would seem to produce false positives after n generations, when the counter rolls
+	-- back around to the same value. However, exactly n invalidations will have happened as
+	-- well, wiping any dangling instances.
 
-	arr[key], arr[-(gen_id + 1)] = gen_id
+	-- That said, in stock Lua or LuaJIT, say, where numbers are doubles (or 64-bit integers
+	-- in 5.3+), much of this is a formality, given how impractically long it would take to
+	-- increment them to overflow.
+	local gen_id = NextID(arr[id_key] or 0, n, arr)
+
+	arr[id_key], arr[-(gen_id + 1)] = gen_id
 end
 
 --- DOCME
@@ -162,7 +151,6 @@ function M.SetSlot_Zero (arr, index, set)
 	arr[-index] = value
 end
 
--- --
 local Commands = { check = true, clear = false, mark = true, set = true }
 
 --- DOCME
@@ -177,26 +165,26 @@ function M.Wrap (arr, n)
 		-- Check / Clear / Mark / Set --
 		-- index: Index in array to check / clear / mark / set
 		-- Return: Was the index marked ("check")? Or did it change (otherwise)?
-		local how = Commands[what]
+		local mark_value = Commands[what]
 
-		if how ~= nil then
-			local marked = arr[-index] == gen_id
+		if mark_value ~= nil then
+			local is_marked = arr[-index] == gen_id
 
 			if what ~= "check" then
 				if what == "set" then
-					how = arg
+					mark_value = arg
 				end
 
-				arr[-index] = how and gen_id or nil
+				arr[-index] = mark_value and gen_id or nil
 
-				return marked == not how
+				return is_marked == not mark_value
 			else
-				return marked
+				return is_marked
 			end
 
 		-- Begin Generation --
 		elseif what == "begin_generation" then
-			gen_id = NextID(gen_id, n, arr) -- see the comment in AuxBeginGeneration()
+			gen_id = NextID(gen_id, n, arr) -- cf. AuxBeginGeneration()
 
 			arr[-(gen_id + 1)] = nil
 
