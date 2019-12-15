@@ -74,7 +74,7 @@ end
 -- @int index
 -- @treturn boolean B
 function M.InUse (arr, index)
-	local elem = index > 0 and arr[index] or 0 -- invalid indices coerced to number
+	local elem = index > 0 and arr[index] ~= nil or 0 -- invalid indices coerced to number
 
 	return type(elem) ~= "number"
 end
