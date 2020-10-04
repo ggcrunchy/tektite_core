@@ -27,7 +27,6 @@
 -- Standard library imports --
 local assert = assert
 local format = string.format
-local insert = table.insert
 local ipairs = ipairs
 local pairs = pairs
 local rawget = rawget
@@ -36,8 +35,7 @@ local tostring = tostring
 local type = type
 
 -- Modules --
-local lazy = require("tektite_core.table.lazy")
-local var_preds = require("tektite_core.var.predicates")
+local meta = require("tektite_core.table.meta")
 
 -- Exports --
 local M = {}
@@ -46,18 +44,35 @@ local M = {}
 --
 --
 
--- Default output function --
 local DefaultOutf
 
--- Ordered list of type names --
 local Names = { "integer", "string", "number", "boolean", "function", "table", "thread", "userdata" }
 
 if pcall(require, "ffi") then
 	Names[#Names + 1] = "cdata"
 end
 
--- Key formats --
-local KeyFormats = { number = "%s[%f] = %s", string = "%s%s = %s" }
+local function IsInteger (v, vtype)
+	return vtype == "number" and v % 1 == 0
+end
+
+local function GatherByType (t)
+	local lists = {}
+
+	for k in pairs(t) do
+		local ktype = type(k)
+
+		if IsInteger(k, ktype) then
+			ktype = "integer"
+		end
+
+		local tlist = lists[ktype] or {}
+
+		tlist[#tlist + 1], lists[ktype] = k, tlist
+	end
+
+	return lists
+end
 
 -- Converts integers to strings, with support for (possibly large) hex integers
 local function IntegerToString (n, hex_uints)
@@ -74,11 +89,10 @@ local function IntegerToString (n, hex_uints)
 	end
 end
 
--- Returns: Type name, pretty print form of value
 local function Pretty (v, hex_uints, guard, tfunc)
 	local vtype = type(v)
 
-	if vtype == "number" and var_preds.IsInteger(v) then
+	if IsInteger(v, vtype) then
 		return "integer", IntegerToString(v, hex_uints)
 	elseif vtype == "string" then
 		return "string", format("\"%s\"", v)
@@ -95,57 +109,43 @@ local function Pretty (v, hex_uints, guard, tfunc)
 	end
 end
 
--- Returns: If true, k1 < k2
 local function KeyComp (k1, k2)
 	return tostring(k1) < tostring(k2)
 end
 
--- Prints a table level
-local function PrintLevel (t, outf, tfunc, indent, guard, hex_uints)
-	local lists = lazy.SubTablesOnDemand()
-	local member_indent = indent .. "   "
+local KeyFormats = { number = "%s[%f] = %s", string = "%s%s = %s" }
 
-	-- Mark this table to guard against cycles.
-	guard[t] = true
+local function PrintLevel (t, outf, tfunc, indent, cycle_guard, hex_uints)
+	cycle_guard[t] = true
 
 	tfunc(t, "new_table")
 
-	-- Collect fields into tables.
-	for k in pairs(t) do
-		local ktype = type(k)
+	local lists, member_indent = GatherByType(t), indent .. "   "
 
-		if ktype == "number" and var_preds.IsInteger(k) then
-			ktype = "integer"
-		end
-
-		insert(lists[ktype], k)
-	end
-
-	-- Iterate over types with elements.
 	for _, name in ipairs(Names) do
-		local subt = rawget(lists, name)
-		local kformat = KeyFormats[name]
+		local subt = lists[name]
 
 		if subt then
+			local kformat = KeyFormats[name]
+
 			sort(subt, (not kformat and name ~= "integer") and KeyComp or nil)
 
 			for _, k in ipairs(subt) do
-				local v = rawget(t, k)
-				local vtype, vstr
+				local v, vtype, vstr = rawget(t, k)
 
 				-- Print out the current line. If the value has string conversion, use
 				-- that, ignoring its type. Otherwise, if this is a table, this will open
 				-- it up; proceed to recursively dump the table itself.
-				if var_preds.HasMeta(v, "__tostring") then
+				if meta.HasToString(v) then
 					vstr = tostring(v)
 				else
-					vtype, vstr = Pretty(v, hex_uints, guard, tfunc)
+					vtype, vstr = Pretty(v, hex_uints, cycle_guard, tfunc)
 				end
 
 				outf(kformat or "%s[%s] = %s", member_indent, kformat and k or tostring(k), vstr)
 
 				if vtype == "table" then
-					PrintLevel(v, outf, tfunc, member_indent, guard, hex_uints)
+					PrintLevel(v, outf, tfunc, member_indent, cycle_guard, hex_uints)
 				end
 			end
 		end
@@ -155,7 +155,6 @@ local function PrintLevel (t, outf, tfunc, indent, guard, hex_uints)
 	outf("%s} (%s)", indent, tostring(t))
 end
 
--- Checks for early out --
 local Checks
 
 -- Has the guard name been used up to the limit?
@@ -173,7 +172,6 @@ local function EarlyOut (name, limit)
 	end
 end
 
--- Default table function: no-op
 local function DefTableFunc () end
 
 --- Pretty prints a variable.
@@ -220,10 +218,10 @@ function M.Print (var, opts)
 	outf = outf or DefaultOutf
 	tfunc = tfunc or DefTableFunc
 
-	assert(var_preds.IsCallable(outf), "Invalid output function")
-	assert(var_preds.IsCallable(tfunc), "Invalid table function")
+	assert(meta.CanCall(outf), "Invalid output function")
+	assert(meta.CanCall(tfunc), "Invalid table function")
 
-	if var_preds.HasMeta(var, "__tostring") then
+	if meta.HasToString(var) then
 		outf("%s%s", indent, tostring(var))
 
 	elseif type(var) == "table" then
@@ -247,7 +245,7 @@ end
 --- Sets the default output function used by @{Print}.
 -- @tparam ?|callable|nil outf Output function to assign, or **nil** to clear the default.
 function M.SetDefaultOutf (outf)
-	assert(outf == nil or var_preds.IsCallable(outf), "Invalid output function")
+	assert(outf == nil or meta.CanCall(outf), "Invalid output function")
 
 	DefaultOutf = outf
 end

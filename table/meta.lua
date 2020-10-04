@@ -27,11 +27,29 @@
 local assert = assert
 local getmetatable = getmetatable
 local pairs = pairs
+local rawget = rawget
 local rawequal = rawequal
 local setmetatable = setmetatable
 local type = type
 
+-- Modules --
+local has_debug, debug = pcall(require, "debug")
+
+-- Pure Lua hacks --
+local debug_getmetatable = has_debug and debug.getmetatable
+
+if not debug_getmetatable then
+	local getmetatable = getmetatable
+
+	function debug_getmetatable (var)
+		local mt = getmetatable(var)
+
+		return type(mt) == "table" and mt
+	end
+end
+
 -- Cached module references --
+local _GetMetafield_
 local _FullyWeak_
 local _WeakKeyed_
 
@@ -177,11 +195,38 @@ for mode, mt in pairs(Choices) do
 	mt.__metatable, mt.__mode = true, mode
 end
 
+--- DOCME
+function M.CanCall (var)
+	return type(var) == "function" or _GetMetafield_(var, "__call") ~= nil
+end
+
 --- Builds a new fully weak table, with a fixed metatable.
 -- @treturn table Table.
 -- @see WeakKeyed, WeakValued
 function M.FullyWeak (choice)
 	return setmetatable({}, Choices.kv)
+end
+
+--- DOCMEMORE
+--
+-- **N.B.** If @{debug.getmetatable} or the @{debug} library itself are absent, a fallback is
+-- used internally. This is unreliable in the presence of a **__metatable** key, however.
+-- @param var Variable to test.
+-- @param name Field to request.
+-- @treturn boolean _var_ supports the metaproperty?
+function M.GetMetafield (var, name)
+	local mt = debug_getmetatable(var)
+
+	if type(mt) == "table" then
+		return rawget(mt, name)
+	else
+		return nil
+	end
+end
+
+--- DOCME
+function M.HasToString (var)
+	return _GetMetafield_(var, "__tostring") ~= nil
 end
 
 --- Builds a new weak-keyed table, with a fixed metatable.
@@ -199,6 +244,7 @@ function M.WeakValued (choice)
 end
 
 _FullyWeak_ = M.FullyWeak
+_GetMetafield_ = M.GetMetafield
 _WeakKeyed_ = M.WeakKeyed
 
 return M
