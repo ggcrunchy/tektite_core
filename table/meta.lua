@@ -35,19 +35,6 @@ local type = type
 -- Modules --
 local has_debug, debug = pcall(require, "debug")
 
--- Pure Lua hacks --
-local debug_getmetatable = has_debug and debug.getmetatable
-
-if not debug_getmetatable then
-	local getmetatable = getmetatable
-
-	function debug_getmetatable (var)
-		local mt = getmetatable(var)
-
-		return type(mt) == "table" and mt
-	end
-end
-
 -- Cached module references --
 local _GetMetafield_
 local _FullyWeak_
@@ -60,7 +47,25 @@ local M = {}
 --
 --
 
-local Cached, Augmented
+local function IsTable (v)
+	return type(v) == "table"
+end
+
+local debug_getmetatable = has_debug and debug.getmetatable
+
+if not debug_getmetatable then
+	local getmetatable = getmetatable
+
+	function debug_getmetatable (var)
+		local mt = getmetatable(var)
+
+		return IsTable(mt) and mt
+	end
+end
+
+--
+--
+--
 
 local function Copy (t, err)
 	assert(type(t) == "table", err)
@@ -76,6 +81,117 @@ local function Copy (t, err)
 	return dt
 end
 
+local function MakeIndexWithList (list, old_index)
+	local is_table = IsTable(old_index)
+
+	return function(t, k)
+		local item = list[k]
+
+		if item ~= nil then
+			return item
+		elseif is_table then
+			return old_index[k]
+		else
+			return old_index(t, k)
+		end
+	end
+end
+
+local function MakeIndexWithReadProperties (rprops, list, old_index)
+	rprops = Copy(rprops, "Invalid readable properties (__rprops)")
+
+	local is_table = IsTable(old_index)
+
+	return function(t, k)
+		local prop = rprops[k]
+
+		if prop then
+			local what, res = prop(t, k)
+
+			if what == "use_index_k" then
+				k = res
+			elseif what ~= "use_index" then
+				return what
+			end
+		end
+
+		local item = list and list[k]
+
+		if item ~= nil then
+			return item
+		elseif is_table then
+			return old_index[k]
+		elseif old_index then
+			return old_index(t, k)
+		end
+	end
+end
+
+local function GetIndexMetamethod (mt, extension)
+	local list
+
+	for k, v in pairs(extension) do
+		if k ~= "__rprops" and k ~= "__wprops" then
+			list = list or setmetatable({}, getmetatable(extension)) -- add lazily, inheriting any lookup behavior
+			list[k] = v
+		end
+	end
+
+	local old_index, rprops = mt and mt.__index, rawget(extension, "__rprops")
+
+	if rprops then
+		return MakeIndexWithReadProperties(rprops, list, old_index)
+	elseif list and old_index then
+		return MakeIndexWithList(list, old_index)
+	elseif list then
+		return list
+	else
+		return old_index
+	end
+end
+
+local function MakeNewIndexWithWriteProperties (wprops, old_newindex)
+	wprops = Copy(wprops, "Invalid writeable properties (__wprops)")
+
+	local is_table = IsTable(old_newindex)
+
+	return function(t, k, v)
+		local prop = wprops[k]
+
+		if prop then
+			local what, res1, res2 = prop(t, v, k)
+
+			if what == "use_newindex_k" then
+				k = res1
+			elseif what == "use_newindex_v" then
+				v = res1
+			elseif what == "use_newindex_kv" then
+				k, v = res1, res2
+			elseif what ~= "use_newindex" then
+				return
+			end
+		end
+
+		if is_table then
+			old_newindex[k] = v
+		elseif old_newindex then
+			old_newindex(t, k, v)
+		end
+	end
+end
+
+local function GetNewIndexMetamethod (mt, extension)
+	local old_newindex, wprops = mt and mt.__newindex, rawget(extension, "__wprops")
+
+	if wprops then
+		return MakeNewIndexWithWriteProperties(wprops, old_newindex)
+	else
+		return old_newindex
+	end
+end
+
+local Cached, Augmented
+
 --- DOCME
 -- @ptable object
 -- @ptable extension
@@ -86,8 +202,8 @@ function M.Augment (object, extension)
 
 	local mt = getmetatable(object)
 
-	assert(type(extension) == "table", "Extension must be a table")
-	assert(mt == nil or type(mt) == "table", "Metatable missing or inaccessible")
+	assert(IsTable(extension), "Extension must be a table")
+	assert(mt == nil or IsTable(mt), "Metatable missing or inaccessible")
 	assert(not Augmented[object], "Object's metatable already augmented")
 
 	local cached = Cached[mt]
@@ -95,93 +211,7 @@ function M.Augment (object, extension)
 	if cached then
 		assert(rawequal(cached, extension), "Attempt to augment object with different extension")
 	else
-		local list, old_index, old_newindex = {}, mt and mt.__index, mt and mt.__newindex
-
-		for k, v in pairs(extension) do
-			if k ~= "__rprops" and k ~= "__wprops" then
-				list[k] = v
-			end
-		end
-
-		setmetatable(list, getmetatable(extension))
-
-		local is_table_oi, index = type(old_index) == "table"
-
-		if extension.__rprops then
-			local rprops = Copy(extension.__rprops, "Invalid readable properties (__rprops)")
-
-			function index (t, k)
-				local prop = rprops[k]
-
-				if prop then
-					local what, res = prop(t, k)
-
-					if what == "use_index_k" then
-						k = res
-					elseif what ~= "use_index" then
-						return what
-					end
-				end
-
-				local item = list[k]
-
-				if item ~= nil then
-					return item
-				elseif is_table_oi then
-					return old_index[k]
-				elseif old_index then
-					return old_index(t, k)
-				end
-			end
-		elseif old_index then
-			function index (t, k)
-				local item = list[k]
-
-				if item ~= nil then
-					return item
-				elseif is_table_oi then
-					return old_index[k]
-				else
-					return old_index(t, k)
-				end
-			end
-		else
-			index = list
-		end
-
-		local is_table_oni, newindex = type(old_newindex) == "table"
-
-		if extension.__wprops then
-			local wprops = Copy(extension.__wprops, "Invalid writeable properties (__wprops)")
-
-			function newindex (t, k, v)
-				local prop = wprops[k]
-
-				if prop then
-					local what, res1, res2 = prop(t, v, k)
-
-					if what == "use_newindex_k" then
-						k = res1
-					elseif what == "use_newindex_v" then
-						v = res1
-					elseif what == "use_newindex_kv" then
-						k, v = res1, res2
-					elseif what ~= "use_newindex" then
-						return
-					end
-				end
-
-				if is_table_oni then
-					old_newindex[k] = v
-				elseif old_newindex then
-					old_newindex(t, k, v)
-				end
-			end
-		else
-			newindex = old_newindex
-		end
-
-		local new = { __index = index, __newindex = newindex }
+		local new = { __index = GetIndexMetamethod(mt, extension), __newindex = GetNewIndexMetamethod(mt, extension) }
 
 		setmetatable(object, new)
 
@@ -203,21 +233,22 @@ end
 --- Builds a new fully weak table, with a fixed metatable.
 -- @treturn table Table.
 -- @see WeakKeyed, WeakValued
-function M.FullyWeak (choice)
+function M.FullyWeak ()
 	return setmetatable({}, Choices.kv)
 end
 
 --- DOCMEMORE
 --
 -- **N.B.** If @{debug.getmetatable} or the @{debug} library itself are absent, a fallback is
--- used internally. This is unreliable in the presence of a **__metatable** key, however.
+-- used internally. This is unreliable in the presence of a **__metatable** key, however. In
+-- situations like this, a C utility built on `luaL_getmetafield()` might be in order.
 -- @param var Variable to test.
 -- @param name Field to request.
 -- @treturn boolean _var_ supports the metaproperty?
 function M.GetMetafield (var, name)
 	local mt = debug_getmetatable(var)
 
-	if type(mt) == "table" then
+	if IsTable(mt) then
 		return rawget(mt, name)
 	else
 		return nil
@@ -232,14 +263,14 @@ end
 --- Builds a new weak-keyed table, with a fixed metatable.
 -- @treturn table Table.
 -- @see FullyWeak, WeakValued
-function M.WeakKeyed (choice)
+function M.WeakKeyed ()
 	return setmetatable({}, Choices.k)
 end
 
 --- Builds a new weak-valued table, with a fixed metatable.
 -- @treturn table Table.
 -- @see FullyWeak, WeakKeyed
-function M.WeakValued (choice)
+function M.WeakValued ()
 	return setmetatable({}, Choices.v)
 end
 
