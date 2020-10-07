@@ -43,19 +43,17 @@ local M = {}
 --
 --
 
---- Adds an extension to a string, as _str_._ext_, e.g. for filenames.
+--- Add an extension to a string, as _str_._ext_, e.g. for filenames.
 --
 -- If _str_ already has the dot and extension, this is a no-op.
 -- @string str String to extend.
 -- @string ext Extension. The first character may be a dot, but this is not necessary.
 -- @treturn string Extended string.
 function M.AddExtension (str, ext)
-	-- Convert any non-dotted extension into a dotted one.
 	if sub(ext, 1, 1) ~= "." then
 		ext = "." .. ext
 	end
 
-	-- If the string already has the extension, just return that; otherwise, add it.
 	if _EndsWith_AnyCase_(str, ext) then
 		return str
 	else
@@ -63,7 +61,7 @@ function M.AddExtension (str, ext)
 	end
 end
 
---- Predicate.
+---
 -- @string str Source string.
 -- @string patt Prefix pattern. (**n.b.** only supports exact "patterns")
 -- @bool get_suffix Get the rest of the string as well?
@@ -91,7 +89,7 @@ function M.BeginsWith_AnyCase (str, patt, get_suffix)
 	return begins_with, (get_suffix and begins_with) and str:sub(patt_len + 1) or ""
 end
 
---- Predicate.
+---
 -- @string str Source string.
 -- @string patt Suffix pattern. (**n.b.** only supports exact "patterns")
 -- @bool get_prefix Get the rest of the string as well?
@@ -119,7 +117,7 @@ function M.EndsWith_AnyCase (str, patt, get_prefix)
 	return ends_with, (get_prefix and ends_with) and str:sub(1, -patt_len - 1) or ""
 end
 
---- Decodes a key built up from two integers.
+--- Decode a key built up from two integers.
 -- @string key A key, as encoded by @{PairToKey}.
 -- @treturn ?uint Value #1... (If _key_ could not be parsed, **nil**.)
 -- @treturn ?uint ...and #2.
@@ -141,7 +139,7 @@ end
 
 Prefix = table.concat(Prefix, "") .. "__"
 
---- Utility.
+---
 -- @treturn string A reasonably unique name.
 function M.NewName ()
 	NameID = NameID + 1
@@ -149,7 +147,7 @@ function M.NewName ()
 	return format("%s%i", Prefix, NameID - 1)
 end
 
---- Encodes two integers as a string key.
+--- Encode two integers as a string key.
 -- @uint a Value #1...
 -- @uint b ...and #2.
 -- @treturn string Key. The values may be read back out via @{KeyToPair}.
@@ -157,7 +155,6 @@ function M.PairToKey (a, b)
 	return format("%ix%i", a, b)
 end
 
--- Common substring remove logic
 local function AuxRemoveLastSubstring (str, patt, rep)
 	local pos = find(reverse(str), patt)
 
