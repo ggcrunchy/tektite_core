@@ -46,6 +46,8 @@ local type = type
 -- Cached module references --
 local _AddToSet_
 local _Append_
+local _IterArray_
+local _IterSet_
 local _RemoveFromArray_
 local _RemoveFromSet_
 local _SimplifyArray_
@@ -127,6 +129,32 @@ function M.Append_Member (t, k, v)
 	t[k] = _Append_(t[k], v)
 end
 
+--- Make a shallow copy of an adaptive array.
+-- @tparam AdaptiveArray arr
+-- @treturn AdaptiveArray Copy.
+function M.CopyArray (arr)
+	local out
+
+	for _, v in _IterArray_(arr) do
+		out = _Append_(out, v)
+	end
+
+	return out
+end
+
+--- Make a shallow copy of an adaptive set.
+-- @tparam AdaptiveSet set
+-- @treturn AdaptiveSet Copy.
+function M.CopySet (set)
+	local out
+
+	for _, v in _IterSet_(set) do
+		out = _AddToSet_(out, v)
+	end
+
+	return out
+end
+
 --- Predicate.
 -- @tparam AdaptiveSet set Set to search.
 -- @param v Value to find.
@@ -139,7 +167,6 @@ function M.InSet (set, v)
 	end
 end
 
--- Iterates nil or singleton posing as array
 local function Single_Array (arr, i)
 	if i == 0 then
 		return 1, arr, true
@@ -153,12 +180,11 @@ end
 function M.IterArray (arr)
 	if type(arr) == "table" then
 		return ipairs(arr)
-	else
+	else -- nil or singleton
 		return Single_Array, arr, arr ~= nil and 0
 	end
 end
 
--- Iterates nil or singleton posing as set
 local function Single_Set (set, guard)
 	if set ~= guard then
 		return set, false
@@ -172,7 +198,7 @@ end
 function M.IterSet (set)
 	if type(set) == "table" then
 		return pairs(set)
-	else
+	else -- nil or singleton
 		return Single_Set, set
 	end
 end
@@ -188,7 +214,6 @@ local function AuxRemove (func, cont, v)
 	return cont
 end
 
--- Tries to remove a value from an array-type adaptive container
 local function ArrayRemove (arr, v)
 	for i, elem in ipairs(arr) do
 		if rawequal(elem, v) then
@@ -221,7 +246,6 @@ function M.RemoveFromArray_Member (t, k, v)
 	t[k] = _RemoveFromArray_(t[k], v)
 end
 
--- Tries to remove a value from a set-type adaptive container
 local function SetRemove (set, v)
 	if v ~= nil then
 		set[v] = nil
@@ -250,7 +274,6 @@ function M.RemoveFromSet_Member (t, k, v)
 	t[k] = _RemoveFromSet_(t[k], v)
 end
 
--- Simplify body
 local function AuxSimplify (t, first, second)
 	if first == nil then
 		return nil
@@ -309,6 +332,8 @@ end
 
 _AddToSet_ = M.AddToSet
 _Append_ = M.Append
+_IterArray_ = M.IterArray
+_IterSet_ = M.IterSet
 _RemoveFromArray_ = M.RemoveFromArray
 _RemoveFromSet_ = M.RemoveFromSet
 _SimplifyArray_ = M.SimplifyArray

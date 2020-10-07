@@ -41,9 +41,6 @@ local insert = table.insert
 local remove = table.remove
 local setmetatable = setmetatable
 
--- Modules --
-local range = require("tektite_core.number.range")
-
 -- Exports --
 local M = {}
 
@@ -52,7 +49,7 @@ local M = {}
 --
 
 -- Find the first sample corresponding to a parameter
-local function AuxLookup (samples, n, x, start) -- n as argument to unify streamline the initialization assert
+local function AuxLookup (samples, n, x, start) -- n as argument to streamline the initialization assert
 	assert(n > 0, "Empty sample set")
 
 	-- Too-low x, or single sample: clamp to first sample.
@@ -65,7 +62,15 @@ local function AuxLookup (samples, n, x, start) -- n as argument to unify stream
 
 	-- A binary search will now succeed, with x known to be within the interval.
 	else
-		local lo, hi, i = 1, n, range.ClampIn(start or floor(.5 * n), 1, n)
+		local lo, hi, i = 1, n, start or floor(.5 * n)
+
+		if i < 1 then
+			i = 1
+		end
+
+		if i > n then
+			i = n
+		end
 
 		while true do
 			-- Narrow interval: just do a linear search.

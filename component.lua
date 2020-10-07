@@ -34,7 +34,6 @@ local type = type
 
 -- Modules --
 local adaptive = require("tektite_core.table.adaptive")
-local array_funcs = require("tektite_core.array.funcs")
 local meta = require("tektite_core.table.meta")
 
 -- Cached module references --
@@ -253,6 +252,23 @@ function M.GetInterfacesForComponent (ctype, out)
     return out
 end
 
+local InterfaceGuards, AddGeneration, IsAdding = meta.WeakKeyed(), 0
+
+local function AddOnFirstAppearance (out, interface, n)
+	if InterfaceGuards[interface] ~= AddGeneration then
+		InterfaceGuards[interface], IsAdding = AddGeneration, true
+		out[n + 1], n = interface, n + 1
+	end
+
+	return n
+end
+
+local function FinishAdding ()
+	if IsAdding then
+		AddGeneration, IsAdding = AddGeneration + 1
+	end
+end
+
 --- Get the list of interfaces implemented by an object's components.
 -- @param object
 -- @tparam[opt] table out If provided, this will be populated and used as the return value.
@@ -269,15 +285,15 @@ function M.GetInterfacesForObject (object, out)
         local info = Types[comp]
 
         for i = 1, #(info or "") do
-            out[n + 1], n = info[i], n + 1
+			n = AddOnFirstAppearance(out, info[i], n)
         end
     end
+
+	FinishAdding()
 
     for i = #out, n + 1, -1 do
         out[i] = nil
     end
-
-    array_funcs.RemoveDups(out)
 
     return out
 end
@@ -374,6 +390,14 @@ function M.LockInObject (object, ctype)
 	Locks[object] = locks
 end
 
+--- Purge some internal non-duplication state.
+function M.PurgeInterfaceGuards ()
+	for k in pairs(InterfaceGuards) do
+		InterfaceGuards[k] = nil
+	end
+end
+
+
 --- Increment the reference count (starting at 0) on a component. While this count is greater
 -- than 0, the component is locked.
 --
@@ -425,7 +449,7 @@ function M.RegisterType (params)
 		assert(Types[name] == nil, "Name already in use")
         assert(actions == nil or type(actions) == "table", "Invalid actions")
 
-        local ctype = {}
+        local ctype, n = {}, 0
 
         for k, v in adaptive.IterSet(actions) do
             assert(Actions[k], "Unsupported action")
@@ -439,20 +463,13 @@ function M.RegisterType (params)
 			end
         end
 
-        local reqs
+        ctype.requirement_list = adaptive.CopyArray(requires) -- put any requirements here for now, but resolve on first use
 
-        for i, name in adaptive.IterArray(requires) do
-            reqs = reqs or {}
-            reqs[i] = name
+        for _, name in adaptive.IterArray(interfaces) do
+			n = AddOnFirstAppearance(ctype, name, n)
         end
 
-        ctype.requirement_list = reqs -- put any requirements here for now, but resolve on first use
-
-        for i, ifx in adaptive.IterArray(interfaces) do
-            ctype[i] = ifx
-        end
-
-        array_funcs.RemoveDups(ctype)
+		FinishAdding()
 
         Types[name] = ctype
     else
