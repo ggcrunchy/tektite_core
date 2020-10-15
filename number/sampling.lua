@@ -48,6 +48,14 @@ local M = {}
 --
 --
 
+local SampleSet = {}
+
+SampleSet.__index = SampleSet
+
+--
+--
+--
+
 -- Find the first sample corresponding to a parameter
 local function AuxLookup (samples, n, x, start) -- n as argument to streamline the initialization assert
 	assert(n > 0, "Empty sample set")
@@ -102,10 +110,6 @@ local function AuxLookup (samples, n, x, start) -- n as argument to streamline t
 	end
 end
 
-local SampleSet = {}
-
-SampleSet.__index = SampleSet
-
 --- Add a new sample to the set, if _x_ is new; otherwise, updates its corresponding sample.
 -- @tparam Param x Parameter to assign.
 --
@@ -153,11 +157,19 @@ function SampleSet:Add (x, y, start)
 	entry.x, entry.y = x, y
 end
 
+--
+--
+--
+
 ---
 -- @treturn uint Sample count.
 function SampleSet:GetCount ()
 	return assert(self.n, "Uninitialized sampling state")
 end
+
+--
+--
+--
 
 -- Given a parameter, gather information about the bin comprising its corresponding samples
 local function FindBin (samples, x, start)
@@ -205,6 +217,10 @@ function SampleSet:Lookup (result, x, start)
 	result.x2, result.y2 = next.x, next.y
 end
 
+--
+--
+--
+
 --- Variant of @{SampleSet:Lookup} parametrized over a unit interval.
 -- @ptable result As per @{SampleSet:Lookup}.
 -- @tparam Param x Ditto, but the parameter space is remapped to [0, 1]. In particular, an
@@ -227,6 +243,10 @@ function SampleSet:Lookup_01 (result, x, start)
 	self:Lookup(result, x, start) 
 end
 
+--
+--
+--
+
 --- Find the samples parametrized by _x_, failing if _x_ is out-of-bounds.
 -- @tparam Param x Parameter to resolve.
 -- @int[opt] start As per @{SampleSet:Lookup}.
@@ -244,6 +264,10 @@ function SampleSet:ToBin (x, start)
 	end
 end
 
+--
+--
+--
+
 --- Variant of @{SampleSet:ToBin} that clamps out-of-bounds parameters.
 --
 -- In effect, this is a more minimalist version of @{SampleSet:Lookup}.
@@ -257,6 +281,10 @@ function SampleSet:ToBin_Clamped (x, start)
 
 	return i, frac or GetFraction(x, entry, next), oob
 end
+
+--
+--
+--
 
 --- Update the **x** and **y** values of an existing sample.
 -- @uint index Sample index, &isin; [1, _n_], where _n_ is the sample count, cf. @{SampleSet:GetCount}.
@@ -283,6 +311,10 @@ function SampleSet:Update (index, x, y)
 	end
 end
 
+--
+--
+--
+
 --- Prepare a table for use, i.e. afterward _samples_ will be a valid **SampleSet**.
 --
 -- If _samples_ is already a **SampleSet**, it will be reset.
@@ -295,5 +327,9 @@ function M.New (samples)
 
 	return setmetatable(samples, SampleSet)
 end
+
+--
+--
+--
 
 return M

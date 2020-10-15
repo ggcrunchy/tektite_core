@@ -80,6 +80,10 @@ do
 	end
 end
 
+--
+--
+--
+
 -- Length via Romberg integration
 do
 	--[[
@@ -140,5 +144,9 @@ do
 		return Rom0[Order]
 	end
 end
+
+--
+--
+--
 
 return M

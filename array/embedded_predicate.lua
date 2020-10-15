@@ -76,12 +76,20 @@ function M.BeginGeneration_ID (arr, opts)
 	AuxBeginGeneration(arr, (opts and opts.id) or "id", opts and opts.n)
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @uint[opt=#arr] n
 function M.BeginGeneration_Zero (arr, n)
 	AuxBeginGeneration(arr, 0, n)
 end
+
+--
+--
+--
 
 --- DOCME
 -- @array arr
@@ -92,6 +100,10 @@ function M.CheckSlot_ID (arr, index, id)
 	return arr[-index] == arr[id or "id"]
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @uint index
@@ -100,12 +112,20 @@ function M.CheckSlot_Zero (arr, index)
 	return arr[-index] == arr[0]
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @uint index
 function M.ClearSlot (arr, index)
 	arr[-index] = nil
 end
+
+--
+--
+--
 
 --- DOCME
 -- @array arr
@@ -115,12 +135,20 @@ function M.MarkSlot_ID (arr, index, id)
 	arr[-index] = arr[id or "id"]
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @uint index
 function M.MarkSlot_Zero (arr, index)
 	arr[-index] = arr[0]
 end
+
+--
+--
+--
 
 --- DOCME
 -- @array arr
@@ -137,6 +165,10 @@ function M.SetSlot_ID (arr, index, set, id)
 	arr[-index] = value
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @uint index
@@ -150,6 +182,10 @@ function M.SetSlot_Zero (arr, index, set)
 
 	arr[-index] = value
 end
+
+--
+--
+--
 
 local Commands = { check = true, clear = false, mark = true, set = true }
 
@@ -194,5 +230,9 @@ function M.Wrap (arr, n)
 		end
 	end, arr
 end
+
+--
+--
+--
 
 return M

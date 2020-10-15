@@ -195,6 +195,7 @@ local Cached, Augmented
 --- DOCME
 -- @ptable object
 -- @ptable extension
+-- @return _object_.
 function M.Augment (object, extension)
 	if not Cached then
 		Augmented, Cached = _FullyWeak_(), _WeakKeyed_()
@@ -217,7 +218,13 @@ function M.Augment (object, extension)
 
 		Augmented[object], Cached[new] = new, extension
 	end
+
+	return object
 end
+
+--
+--
+--
 
 local Choices = { k = {}, v = {}, kv = {} }
 
@@ -230,12 +237,20 @@ function M.CanCall (var)
 	return type(var) == "function" or _GetMetafield_(var, "__call") ~= nil
 end
 
---- Builds a new fully weak table, with a fixed metatable.
+--
+--
+--
+
+--- Build a new fully weak table, with a fixed metatable.
 -- @treturn table Table.
 -- @see WeakKeyed, WeakValued
 function M.FullyWeak ()
 	return setmetatable({}, Choices.kv)
 end
+
+--
+--
+--
 
 --- DOCMEMORE
 --
@@ -255,24 +270,40 @@ function M.GetMetafield (var, name)
 	end
 end
 
+--
+--
+--
+
 --- DOCME
 function M.HasToString (var)
 	return _GetMetafield_(var, "__tostring") ~= nil
 end
 
---- Builds a new weak-keyed table, with a fixed metatable.
+--
+--
+--
+
+--- Build a new weak-keyed table, with a fixed metatable.
 -- @treturn table Table.
 -- @see FullyWeak, WeakValued
 function M.WeakKeyed ()
 	return setmetatable({}, Choices.k)
 end
 
---- Builds a new weak-valued table, with a fixed metatable.
+--
+--
+--
+
+--- Build a new weak-valued table, with a fixed metatable.
 -- @treturn table Table.
 -- @see FullyWeak, WeakKeyed
 function M.WeakValued ()
 	return setmetatable({}, Choices.v)
 end
+
+--
+--
+--
 
 _FullyWeak_ = M.FullyWeak
 _GetMetafield_ = M.GetMetafield

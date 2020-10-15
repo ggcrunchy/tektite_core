@@ -61,6 +61,10 @@ function M.AddExtension (str, ext)
 	end
 end
 
+--
+--
+--
+
 ---
 -- @string str Source string.
 -- @string patt Prefix pattern. (**n.b.** only supports exact "patterns")
@@ -74,6 +78,10 @@ function M.BeginsWith (str, patt, get_suffix)
 
 	return begins_with, (get_suffix and begins_with) and str:sub(patt_len + 1) or ""
 end
+
+--
+--
+--
 
 --- Case-insensitive variant of @{BeginsWith}.
 -- @string str Source string.
@@ -89,6 +97,10 @@ function M.BeginsWith_AnyCase (str, patt, get_suffix)
 	return begins_with, (get_suffix and begins_with) and str:sub(patt_len + 1) or ""
 end
 
+--
+--
+--
+
 ---
 -- @string str Source string.
 -- @string patt Suffix pattern. (**n.b.** only supports exact "patterns")
@@ -102,6 +114,10 @@ function M.EndsWith (str, patt, get_prefix)
 
 	return ends_with, (get_prefix and ends_with) and str:sub(1, -patt_len - 1) or ""
 end
+
+--
+--
+--
 
 --- Case-insensitive variant of @{EndsWith}.
 -- @string str Source string.
@@ -117,6 +133,10 @@ function M.EndsWith_AnyCase (str, patt, get_prefix)
 	return ends_with, (get_prefix and ends_with) and str:sub(1, -patt_len - 1) or ""
 end
 
+--
+--
+--
+
 --- Decode a key built up from two integers.
 -- @string key A key, as encoded by @{PairToKey}.
 -- @treturn ?uint Value #1... (If _key_ could not be parsed, **nil**.)
@@ -126,6 +146,10 @@ function M.KeyToPair (key)
 
 	return tonumber(a), tonumber(b)
 end
+
+--
+--
+--
 
 -- The input used to generate random names --
 local NameID = 0
@@ -147,6 +171,10 @@ function M.NewName ()
 	return format("%s%i", Prefix, NameID - 1)
 end
 
+--
+--
+--
+
 --- Encode two integers as a string key.
 -- @uint a Value #1...
 -- @uint b ...and #2.
@@ -154,6 +182,10 @@ end
 function M.PairToKey (a, b)
 	return format("%ix%i", a, b)
 end
+
+--
+--
+--
 
 local function AuxRemoveLastSubstring (str, patt, rep)
 	local pos = find(reverse(str), patt)
@@ -170,30 +202,33 @@ function M.RemoveLastSubstring (str, patt, rep)
 	return AuxRemoveLastSubstring(str, patt, rep) or ""
 end
 
+--
+--
+--
+
 --- DOCME
 function M.RemoveLastSubstring_Keep (str, patt, rep)
 	return AuxRemoveLastSubstring(str, patt, rep) or str
 end
 
--- --
+--
+--
+--
+
 local SplitFuncs, Spacer = {}
 
---
 local function LowerSpacerUpper (last, next)
 	return last .. Spacer .. next
 end
 
---
 function SplitFuncs.case_switch (str)
 	return gsub(str, "(%l)(%u)", LowerSpacerUpper)
 end
 
---
 local function SpacerToUpper (letter)
 	return Spacer .. upper(letter)
 end
 
---
 function SplitFuncs.on_pattern (str, opts)
 	local patt = opts and opts.patt or "_"
 
@@ -218,6 +253,10 @@ function M.SplitIntoWords (str, how, opts)
 
 	return str
 end
+
+--
+--
+--
 
 _EndsWith_AnyCase_ = M.EndsWith_AnyCase
 

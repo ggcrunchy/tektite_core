@@ -56,6 +56,10 @@ function M.Extend (arr, n, free)
 	return free
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @tparam ?|uint|nil free
@@ -69,6 +73,10 @@ function M.GetInsertIndex (arr, free)
 	end
 end
 
+--
+--
+--
+
 --- DOCME
 -- @array arr
 -- @int index
@@ -78,6 +86,10 @@ function M.InUse (arr, index)
 
 	return type(elem) ~= "number"
 end
+
+--
+--
+--
 
 --- DOCME
 -- @array arr
@@ -106,5 +118,9 @@ function M.RemoveAt (arr, index, free)
 	-- Adjust the free stack top.
 	return free
 end
+
+--
+--
+--
 
 return M

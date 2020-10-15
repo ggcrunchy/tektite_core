@@ -38,7 +38,7 @@ local M = {}
 --
 --
 
---- Clamps a number between two bounds.
+--- Clamp a number between two bounds.
 --
 -- The bounds are swapped if out of order.
 -- @number n Number to clamp.
@@ -53,7 +53,11 @@ function M.ClampIn (n, minb, maxb)
 	return min(max(n, minb), maxb)
 end
 
---- Utility.
+--
+--
+--
+
+---
 -- @number a Value #1.
 -- @number b Value #2.
 -- @treturn number Minimum value.
@@ -61,6 +65,10 @@ end
 function M.MinMax (a, b)
 	return min(a, b), max(a, b)
 end
+
+--
+--
+--
 
 --- Variant of @{MinMax} that contrains its arguments to an interval.
 --
@@ -79,6 +87,10 @@ function M.MinMax_Interval (a, b, m, n)
 	return max(a, m), min(b, n)
 end
 
+--
+--
+--
+
 --- Variant of @{MinMax} that contrains its arguments to a range.
 --
 -- The return values proviso applies as per @{MinMax_Interval}.
@@ -93,12 +105,20 @@ function M.MinMax_N (a, b, n)
 	return max(a, 1), min(b, n)
 end
 
+--
+--
+--
+
 --- DOCME
 function M.MinMax_New (a, b, new)
 	a, b = _MinMax_(a or new, b or new)
 
 	return min(a, new), max(b, new)
 end
+
+--
+--
+--
 
 --- Rounds a number to the nearest multiple of some increment.
 -- @number n Number to round.
@@ -109,6 +129,10 @@ function M.RoundTo (n, inc)
 
 	return floor(n / inc + .5) * inc
 end
+
+--
+--
+--
 
 _MinMax_ = M.MinMax
 

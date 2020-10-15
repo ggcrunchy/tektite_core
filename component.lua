@@ -132,6 +132,10 @@ end
 
 -- TODO: handle calling Lock, etc. from on_add, so those don't trounce 
 
+--
+--
+--
+
 local function AllowedByCurrentList (list, object, ctype)
     for comp in adaptive.IterSet(list) do
         local info = Types[comp]
@@ -213,6 +217,10 @@ function M.CanAddToObject (object, ctype)
     return true
 end
 
+--
+--
+--
+
 ---
 -- @param object
 -- @param ctype Component type.
@@ -226,6 +234,10 @@ function M.FoundInObject (object, ctype)
 
     return false
 end
+
+--
+--
+--
 
 --- Get the list of interfaces implemented by a component.
 -- @param ctype
@@ -251,6 +263,10 @@ function M.GetInterfacesForComponent (ctype, out)
 
     return out
 end
+
+--
+--
+--
 
 local InterfaceGuards, AddGeneration, IsAdding = meta.WeakKeyed(), 0
 
@@ -298,6 +314,10 @@ function M.GetInterfacesForObject (object, out)
     return out
 end
 
+--
+--
+--
+
 --- Get the list of component types belonging to an object.
 -- @param object
 -- @tparam[opt] table out If provided, this will be populated and used as the return value.
@@ -321,6 +341,10 @@ function M.GetListForObject (object, out)
     return out
 end
 
+--
+--
+--
+
 local function AuxImplements (info, what)
     for i = 1, #(info or "") do
         if rawequal(info[i], what) then
@@ -341,6 +365,9 @@ function M.Implements (ctype, what)
     return AuxImplements(info, what) or false -- coerce nil to false
 end
 
+--
+--
+--
 ---
 -- @param object
 -- @param what Interface.
@@ -355,12 +382,20 @@ function M.ImplementedByObject (object, what)
     return false
 end
 
+--
+--
+--
+
 ---
 -- @param ctype Component type.
 -- @treturn boolean Has _ctype_ been registered?
 function M.IsRegistered (ctype)
 	return Types[ctype] ~= nil
 end
+
+--
+--
+--
 
 local Locks = meta.WeakKeyed()
 
@@ -390,6 +425,10 @@ function M.LockInObject (object, ctype)
 	Locks[object] = locks
 end
 
+--
+--
+--
+
 --- Purge some internal non-duplication state.
 function M.PurgeInterfaceGuards ()
 	for k in pairs(InterfaceGuards) do
@@ -397,6 +436,9 @@ function M.PurgeInterfaceGuards ()
 	end
 end
 
+--
+--
+--
 
 --- Increment the reference count (starting at 0) on a component. While this count is greater
 -- than 0, the component is locked.
@@ -414,6 +456,10 @@ function M.RefInObject (object, ctype)
 
 	Locks[object] = locks
 end
+
+--
+--
+--
 
 local Actions = { add = true, allow_add = true, remove = true }
 
@@ -481,6 +527,10 @@ function M.RegisterType (params)
 	return name
 end
 
+--
+--
+--
+
 local function AuxRemove (object, comp)
     local info = Types[comp]
     local on_remove = info and info.remove
@@ -516,6 +566,10 @@ function M.RemoveAllFromObject (object)
         Lists[object] = nil
     end
 end
+
+--
+--
+--
 
 local ToRemove = {}
 
@@ -580,6 +634,10 @@ function M.RemoveFromObject (object, ctype)
     return exists
 end
 
+--
+--
+--
+
 --- Decrement the reference count for a component, unlocking it if the count falls to 0.
 --
 -- This is a no-op after @{LockInObject} has been called.
@@ -605,6 +663,10 @@ function M.UnrefInObject (object, ctype)
 
 	Locks[object] = locks
 end
+
+--
+--
+--
 
 _CanAddToObject_ = M.CanAddToObject
 _RemoveFromObject_ = M.RemoveFromObject

@@ -174,7 +174,7 @@ end
 
 local function DefTableFunc () end
 
---- Pretty prints a variable.
+--- Pretty print a variable.
 --
 -- If a variable has a **"tostring"** metamethod, this is invoked and the result is printed.
 -- Otherwise, some "pretty" behavior is applied to it; if the variable is a table, it will
@@ -242,7 +242,11 @@ function M.Print (var, opts)
 	end
 end
 
---- Sets the default output function used by @{Print}.
+--
+--
+--
+
+--- Set the default output function used by @{Print}.
 -- @tparam ?|callable|nil outf Output function to assign, or **nil** to clear the default.
 function M.SetDefaultOutf (outf)
 	assert(outf == nil or meta.CanCall(outf), "Invalid output function")

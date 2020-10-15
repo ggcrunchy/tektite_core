@@ -60,7 +60,7 @@ local M = {}
 --
 --
 
---- Adds an element to an adaptive set.
+--- Add an element to an adaptive set.
 -- @tparam AdaptiveSet set
 -- @param v Value to add; **nil** is ignored.
 function M.AddToSet (set, v)
@@ -85,6 +85,10 @@ function M.AddToSet (set, v)
 	return set
 end
 
+--
+--
+--
+
 --- Variant of @{AddToSet}, with `set = t[k]`.
 --
 -- The updated set is stored in _t_&#91;_k_&#93;.
@@ -95,7 +99,11 @@ function M.AddToSet_Member (t, k, v)
 	t[k] = _AddToSet_(t[k], v)
 end
 
---- Appends an element to an adaptive array.
+--
+--
+--
+
+--- Append an element to an adaptive array.
 -- @tparam AdaptiveArray arr
 -- @param v Value to append; **nil** is ignored.
 -- @treturn AdapativeArray Updated array.
@@ -119,6 +127,10 @@ function M.Append (arr, v)
 	end
 end
 
+--
+--
+--
+
 --- Variant of @{Append}, with `arr = t[k]`.
 --
 -- The updated array is stored in _t_&#91;_k_&#93;.
@@ -128,6 +140,10 @@ end
 function M.Append_Member (t, k, v)
 	t[k] = _Append_(t[k], v)
 end
+
+--
+--
+--
 
 --- Make a shallow copy of an adaptive array.
 -- @tparam AdaptiveArray arr
@@ -142,6 +158,10 @@ function M.CopyArray (arr)
 	return out
 end
 
+--
+--
+--
+
 --- Make a shallow copy of an adaptive set.
 -- @tparam AdaptiveSet set
 -- @treturn AdaptiveSet Copy.
@@ -155,7 +175,11 @@ function M.CopySet (set)
 	return out
 end
 
---- Predicate.
+--
+--
+--
+
+---
 -- @tparam AdaptiveSet set Set to search.
 -- @param v Value to find.
 -- @treturn boolean _v_ is in _set_?
@@ -167,13 +191,17 @@ function M.InSet (set, v)
 	end
 end
 
+--
+--
+--
+
 local function Single_Array (arr, i)
 	if i == 0 then
 		return 1, arr, true
 	end
 end
 
---- Iterates over the (0 or more) elements in the array.
+--- Iterate over the (0 or more) elements in the array.
 -- @tparam AdaptiveArray arr Array to iterate.
 -- @treturn iterator Supplies index, value. If the value is a singleton, **true** is also
 -- supplied as a third result.
@@ -185,13 +213,17 @@ function M.IterArray (arr)
 	end
 end
 
+--
+--
+--
+
 local function Single_Set (set, guard)
 	if set ~= guard then
 		return set, false
 	end
 end
 
---- Iterates over the (0 or more) elements in the set.
+--- Iterate over the (0 or more) elements in the set.
 -- @tparam AdaptiveSet set Set to iterate.
 -- @treturn iterator Supplies value, boolean (if **true**, the set is in table form;
 -- otherwise, the value is a singleton).
@@ -202,6 +234,10 @@ function M.IterSet (set)
 		return Single_Set, set
 	end
 end
+
+--
+--
+--
 
 -- Tries to remove a value from the adaptive container, accounting for non-tables
 local function AuxRemove (func, cont, v)
@@ -224,7 +260,7 @@ local function ArrayRemove (arr, v)
 	end
 end
 
---- Removes an element from an adaptive array.
+--- Remove an element from an adaptive array.
 --
 -- If _arr_ is **nil** or _v_ is absent, this is a no-op.
 -- @tparam AdaptiveArray arr
@@ -233,6 +269,10 @@ end
 function M.RemoveFromArray (arr, v)
 	return AuxRemove(ArrayRemove, arr, v)
 end
+
+--
+--
+--
 
 --- Variant of @{RemoveFromArray}, with `arr = t[k]`.
 --
@@ -246,13 +286,17 @@ function M.RemoveFromArray_Member (t, k, v)
 	t[k] = _RemoveFromArray_(t[k], v)
 end
 
+--
+--
+--
+
 local function SetRemove (set, v)
 	if v ~= nil then
 		set[v] = nil
 	end
 end
 
---- Removes an element from an adaptive set.
+--- Remove an element from an adaptive set.
 --
 -- If _set_ is **nil** or _v_ is absent, this is a no-op.
 -- @tparam AdaptiveSet set
@@ -261,6 +305,10 @@ end
 function M.RemoveFromSet (set, v)
 	return AuxRemove(SetRemove, set, v)
 end
+
+--
+--
+--
 
 --- Variant of @{RemoveFromSet}, with `set = t[k]`.
 --
@@ -273,6 +321,10 @@ end
 function M.RemoveFromSet_Member (t, k, v)
 	t[k] = _RemoveFromSet_(t[k], v)
 end
+
+--
+--
+--
 
 local function AuxSimplify (t, first, second)
 	if first == nil then
@@ -297,6 +349,10 @@ function M.SimplifyArray (arr)
 	return arr
 end
 
+--
+--
+--
+
 --- Variant of @{SimplifyArray}, with `arr = t[k]`.
 --
 -- The updated array is stored in _t_&#91;_k_&#93;.
@@ -305,6 +361,10 @@ end
 function M.SimplifyArray_Member (t, k)
 	t[k] = _SimplifyArray_(t[k])
 end
+
+--
+--
+--
 
 --- If _set_ is not a table, this is a no-op.
 --
@@ -321,6 +381,10 @@ function M.SimplifySet (set)
 	return set
 end
 
+--
+--
+--
+
 --- Variant of @{SimplifySet}, with `set = t[k]`.
 --
 -- The updated set is stored in _t_&#91;_k_&#93;.
@@ -329,6 +393,10 @@ end
 function M.SimplifySet_Member (t, k)
 	t[k] = _SimplifySet_(t[k])
 end
+
+--
+--
+--
 
 _AddToSet_ = M.AddToSet
 _Append_ = M.Append
