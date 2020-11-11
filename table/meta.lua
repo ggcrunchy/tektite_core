@@ -68,7 +68,7 @@ end
 --
 
 local function Copy (t, err)
-	assert(type(t) == "table", err)
+	assert(IsTable(t), err)
 
 	local dt = {}
 
@@ -97,16 +97,40 @@ local function MakeIndexWithList (list, old_index)
 	end
 end
 
-local function MakeIndexWithReadProperties (rprops, list, old_index)
+local function OldIndexResult (old_index, t, k)
+	if IsTable(old_index) then
+		return old_index[k]
+	elseif old_index then
+		return old_index(t, k)
+	end
+end
+
+local function MakeIndexWithReadProperties (rprops, roldarg, list, old_index)
 	rprops = Copy(rprops, "Invalid readable properties (__rprops)")
 
-	local is_table = IsTable(old_index)
+	if roldarg then
+		assert(IsTable(roldarg), "Invalid old __index result argument flags (__roldarg)")
+
+		local old = roldarg
+
+		roldarg = {}
+
+		for k, v in pairs(old) do
+			if v then
+				roldarg[k] = true
+			end
+		end
+	end
 
 	return function(t, k)
-		local prop = rprops[k]
+		local prop, old_result = rprops[k]
 
 		if prop then
-			local what, res = prop(t, k)
+			if roldarg and roldarg[k] then
+				old_result = OldIndexResult(old_index, t, k)
+			end
+
+			local what, res = prop(t, k, old_result)
 
 			if what == "use_index_k" then
 				k = res
@@ -119,10 +143,8 @@ local function MakeIndexWithReadProperties (rprops, list, old_index)
 
 		if item ~= nil then
 			return item
-		elseif is_table then
-			return old_index[k]
-		elseif old_index then
-			return old_index(t, k)
+		else
+			return OldIndexResult(old_index, t, k)
 		end
 	end
 end
@@ -131,7 +153,7 @@ local function GetIndexMetamethod (mt, extension)
 	local list
 
 	for k, v in pairs(extension) do
-		if k ~= "__rprops" and k ~= "__wprops" then
+		if k ~= "__roldarg" and k ~= "__rprops" and k ~= "__wprops" then
 			list = list or setmetatable({}, getmetatable(extension)) -- add lazily, inheriting any lookup behavior
 			list[k] = v
 		end
@@ -140,7 +162,7 @@ local function GetIndexMetamethod (mt, extension)
 	local old_index, rprops = mt and mt.__index, rawget(extension, "__rprops")
 
 	if rprops then
-		return MakeIndexWithReadProperties(rprops, list, old_index)
+		return MakeIndexWithReadProperties(rprops, rawget(extension, "__roldarg"), list, old_index)
 	elseif list and old_index then
 		return MakeIndexWithList(list, old_index)
 	elseif list then
