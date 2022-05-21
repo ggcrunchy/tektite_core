@@ -52,18 +52,18 @@ local RequiredTypeCache = {} -- allow lock and ref ops in add
 local Types = {}
 
 local function AuxGatherRequiredTypes (required_types, ctype)
-    required_types[ctype] = true
+  required_types[ctype] = true
 
-    local info = Types[ctype]
-    local reqs = info and info.requirements
+  local info = Types[ctype]
+  local reqs = info and info.requirements
 
-    if reqs then
-        for k in adaptive.IterSet(reqs) do
-            if not required_types[k] then
-                AuxGatherRequiredTypes(required_types, k)
-            end
-        end
+  if reqs then
+    for k in adaptive.IterSet(reqs) do
+      if not required_types[k] then
+        AuxGatherRequiredTypes(required_types, k)
+      end
     end
+  end
 end
 
 local function AuxIterRequiredTypes_Keep (types, k)
@@ -108,26 +108,26 @@ local Lists = meta.WeakKeyed()
 -- @treturn boolean The addition succeeded.
 -- @see CanAddToObject
 function M.AddToObject (object, ctype)
-    local can_add = _CanAddToObject_(object, ctype)
+  local can_add = _CanAddToObject_(object, ctype)
 
-    if can_add then
-        local list = Lists[object]
+  if can_add then
+    local list = Lists[object]
 
-        for rtype in RequiredTypes(ctype) do
-            local info = Types[rtype]
-            local on_add = info and info.add
+    for rtype in RequiredTypes(ctype) do
+      local info = Types[rtype]
+      local on_add = info and info.add
 
-            if on_add then
-                on_add(object, rtype)
-            end
+      if on_add then
+        on_add(object, rtype)
+      end
 
-            list = adaptive.AddToSet(list, rtype)
-        end
-
-        Lists[object] = list
+      list = adaptive.AddToSet(list, rtype)
     end
 
-    return can_add
+    Lists[object] = list
+  end
+
+  return can_add
 end
 
 -- TODO: handle calling Lock, etc. from on_add, so those don't trounce 
@@ -137,47 +137,47 @@ end
 --
 
 local function AllowedByCurrentList (list, object, ctype)
-    for comp in adaptive.IterSet(list) do
-        local info = Types[comp]
-        local on_allow_add = info and info.allow_add
+  for comp in adaptive.IterSet(list) do
+    local info = Types[comp]
+    local on_allow_add = info and info.allow_add
 
-        if on_allow_add then
-            local ok, err = on_allow_add(ctype, object, comp)
+    if on_allow_add then
+      local ok, err = on_allow_add(ctype, object, comp)
 
-            if not ok then
-                return false, err
-            end
-        end
+      if not ok then
+        return false, err
+      end
     end
+  end
 
-    return true
+  return true
 end
 
 local function EnsureRequiredTypesInfo (info)
-    local req_list = info and info.requirement_list
+  local req_list = info and info.requirement_list
 
-    if req_list then -- not yet resolved?
-        local reqs, rlist = {}, info.requirement_list -- save list in case of error...
+  if req_list then -- not yet resolved?
+    local reqs, rlist = {}, info.requirement_list -- save list in case of error...
 
-        info.requirement_list = nil -- ...but remove it to guard against recursion
+    info.requirement_list = nil -- ...but remove it to guard against recursion
 
-        for i = 1, #req_list do
-            local rtype = req_list[i]
-            local rinfo = Types[rtype]
+    for i = 1, #req_list do
+      local rtype = req_list[i]
+      local rinfo = Types[rtype]
 
-            if rinfo == nil or not EnsureRequiredTypesInfo(rinfo) then
-                info.requirement_list = rlist -- failure, so restore list
+      if rinfo == nil or not EnsureRequiredTypesInfo(rinfo) then
+        info.requirement_list = rlist -- failure, so restore list
 
-                return false
-            else
-                reqs[rtype] = true
-            end
-        end
-
-        info.requirements = reqs
+        return false
+      else
+        reqs[rtype] = true
+      end
     end
 
-    return true
+    info.requirements = reqs
+  end
+
+  return true
 end
 
 --- Check whether the object can accept the component.
@@ -190,31 +190,31 @@ end
 -- @treturn string Failure reason.
 -- @see AddToObject
 function M.CanAddToObject (object, ctype)
-    local list, info = Lists[object], Types[ctype]
+  local list, info = Lists[object], Types[ctype]
 
-    if info == nil then
-        return false, "Type not registered"
-    elseif adaptive.InSet(list, ctype) then
-        return false, "Already present"
-    elseif not EnsureRequiredTypesInfo(info) then -- resolve any requirements on first request
-        return false, "Required type not registered"
-    else
-        if info and info.requirements then -- ensure we can add required components, if necessary...
-            for rtype in pairs(info.requirements) do
-                if not adaptive.InSet(list, rtype) then
-                    local ok, err = AllowedByCurrentList(list, object, rtype)
+  if info == nil then
+    return false, "Type not registered"
+  elseif adaptive.InSet(list, ctype) then
+    return false, "Already present"
+  elseif not EnsureRequiredTypesInfo(info) then -- resolve any requirements on first request
+    return false, "Required type not registered"
+  else
+    if info and info.requirements then -- ensure we can add required components, if necessary...
+      for rtype in pairs(info.requirements) do
+        if not adaptive.InSet(list, rtype) then
+          local ok, err = AllowedByCurrentList(list, object, rtype)
 
-                    if not ok then
-                        return false, err
-                    end
-                end
-            end
+          if not ok then
+            return false, err
+          end
         end
-
-        return AllowedByCurrentList(list, object, ctype) -- ...as well as the requested one
+      end
     end
 
-    return true
+    return AllowedByCurrentList(list, object, ctype) -- ...as well as the requested one
+  end
+
+  return true
 end
 
 --
@@ -226,13 +226,13 @@ end
 -- @param ctype Component type.
 -- @treturn boolean Does _ctype_ belong to _object_?
 function M.FoundInObject (object, ctype)
-    for comp in adaptive.IterSet(Lists[object]) do
-        if rawequal(comp, ctype) then
-            return true
-        end
+  for comp in adaptive.IterSet(Lists[object]) do
+    if rawequal(comp, ctype) then
+      return true
     end
+  end
 
-    return false
+  return false
 end
 
 --
@@ -247,21 +247,21 @@ end
 -- @treturn {Interface,...} Array of interfaces.
 -- @see GetInterfacesForObject, Implements, RegisterType
 function M.GetInterfacesForComponent (ctype, out)
-    out = out or {}
+  out = out or {}
 
-    local info, n = Types[ctype], 0
+  local info, n = Types[ctype], 0
 
-    assert(info ~= nil, "Type not registered")
+  assert(info ~= nil, "Type not registered")
 
 	for i = 1, #(info or "") do
 		out[n + 1], n = info[i], n + 1
 	end
 
-    for i = #out, n + 1, -1 do
-        out[i] = nil
-    end
+  for i = #out, n + 1, -1 do
+    out[i] = nil
+  end
 
-    return out
+  return out
 end
 
 --
@@ -293,25 +293,25 @@ end
 -- @treturn {Interface,...} Array of interfaces, with duplicates removed.
 -- @see Implements, RegisterType
 function M.GetInterfacesForObject (object, out)
-    out = out or {}
+  out = out or {}
 
-    local n = 0
+  local n = 0
 
-    for comp in adaptive.IterSet(Lists[object]) do
-        local info = Types[comp]
+  for comp in adaptive.IterSet(Lists[object]) do
+    local info = Types[comp]
 
-        for i = 1, #(info or "") do
-			n = AddOnFirstAppearance(out, info[i], n)
-        end
+    for i = 1, #(info or "") do
+      n = AddOnFirstAppearance(out, info[i], n)
     end
+  end
 
 	FinishAdding()
 
-    for i = #out, n + 1, -1 do
-        out[i] = nil
-    end
+  for i = #out, n + 1, -1 do
+    out[i] = nil
+  end
 
-    return out
+  return out
 end
 
 --
@@ -326,19 +326,19 @@ end
 -- @treturn {ComponentType,...} Array of types.
 -- @see AddToObject, RegisterType
 function M.GetListForObject (object, out)
-    out = out or {}
+  out = out or {}
 
-    local n = 0
+  local n = 0
 
-    for comp in adaptive.IterSet(Lists[object]) do
-        out[n + 1], n = comp, n + 1
-    end
+  for comp in adaptive.IterSet(Lists[object]) do
+    out[n + 1], n = comp, n + 1
+  end
 
-    for i = #out, n + 1, -1 do
-        out[i] = nil
-    end
+  for i = #out, n + 1, -1 do
+    out[i] = nil
+  end
 
-    return out
+  return out
 end
 
 --
@@ -346,11 +346,11 @@ end
 --
 
 local function AuxImplements (info, what)
-    for i = 1, #(info or "") do
-        if rawequal(info[i], what) then
-            return true
-        end
+  for i = 1, #(info or "") do
+    if rawequal(info[i], what) then
+      return true
     end
+  end
 end
 
 ---
@@ -358,11 +358,11 @@ end
 -- @param what Interface.
 -- @treturn boolean Does _ctype_ implement _what_?
 function M.Implements (ctype, what)
-    local info = Types[ctype]
+  local info = Types[ctype]
 
-    assert(info ~= nil, "Type not registered")
+  assert(info ~= nil, "Type not registered")
 
-    return AuxImplements(info, what) or false -- coerce nil to false
+  return AuxImplements(info, what) or false -- coerce nil to false
 end
 
 --
@@ -373,13 +373,13 @@ end
 -- @param what Interface.
 -- @treturn boolean Does _object_ have a component that implements _what_?
 function M.ImplementedByObject (object, what)
-    for comp in adaptive.IterSet(Lists[object]) do
-        if AuxImplements(Types[comp], what) then
-            return true
-        end
+  for comp in adaptive.IterSet(Lists[object]) do
+    if AuxImplements(Types[comp], what) then
+      return true
     end
+  end
 
-    return false
+  return false
 end
 
 --
@@ -404,7 +404,7 @@ local Inf = 1 / 0
 local function NotLocked (locks, ctype)
 	local count = locks[ctype] or 0
 
-    return 1 / count ~= 0
+  return 1 / count ~= 0
 end
 
 --- Permanently lock a component into this object.
@@ -414,13 +414,13 @@ end
 -- @param ctype Component type.
 -- @see RefInObject, RemoveAllFromObject, RemoveFromObject, UnrefInObject
 function M.LockInObject (object, ctype)
-    local locks = Locks[object] or {}
+  local locks = Locks[object] or {}
 
-    if NotLocked(locks, ctype) then
+  if NotLocked(locks, ctype) then
 		for rtype in RequiredTypes(ctype) do
 			locks[rtype] = Inf
 		end
-    end
+  end
 
 	Locks[object] = locks
 end
@@ -446,13 +446,13 @@ end
 -- This is a no-op after @{LockInObject} has been called.
 -- @see RemoveAllFromObject, RemoveFromObject, UnrefInObject
 function M.RefInObject (object, ctype)
-    local locks = Locks[object] or {}
+  local locks = Locks[object] or {}
 	
 	if NotLocked(locks, ctype) then
-        for rtype in RequiredTypes(ctype) do
-            locks[rtype] = (locks[rtype] or 0) + 1 -- if infinity, left as-is
-        end
+    for rtype in RequiredTypes(ctype) do
+      locks[rtype] = (locks[rtype] or 0) + 1 -- if infinity, left as-is
     end
+  end
 
 	Locks[object] = locks
 end
@@ -479,50 +479,50 @@ end
 -- @return Name, as a convenience.
 -- @see AddToObject, CanAddToObject, RemoveFromObject
 function M.RegisterType (params)
-    local ptype, name, actions, interfaces, requires = type(params)
+  local ptype, name, actions, interfaces, requires = type(params)
 
-    if ptype == "string" then
-        name = params
-    else
-        assert(ptype == "table", "Expected string or table params")
+  if ptype == "string" then
+    name = params
+  else
+    assert(ptype == "table", "Expected string or table params")
 
-        name, actions, interfaces, requires = params.name, params.actions, params.interfaces, params.requires
+    name, actions, interfaces, requires = params.name, params.actions, params.interfaces, params.requires
+  end
+
+  assert(name ~= nil, "Expected component name")
+
+  if actions or interfaces or requires then
+    assert(Types[name] == nil, "Name already in use")
+    assert(actions == nil or type(actions) == "table", "Invalid actions")
+
+    local ctype, n = {}, 0
+
+    for k, v in adaptive.IterSet(actions) do
+      assert(Actions[k], "Unsupported action")
+
+      if v == "is_table" then
+        assert(k == "allow_add", "Predicate only used on `allow_add` action")
+
+        v = IsTable
+      end
+
+      ctype[k] = v
     end
 
-    assert(name ~= nil, "Expected component name")
+    ctype.requirement_list = adaptive.CopyArray(requires) -- put any requirements here for now, but resolve on first use
 
-    if actions or interfaces or requires then
-		assert(Types[name] == nil, "Name already in use")
-        assert(actions == nil or type(actions) == "table", "Invalid actions")
-
-        local ctype, n = {}, 0
-
-        for k, v in adaptive.IterSet(actions) do
-            assert(Actions[k], "Unsupported action")
-
-			if rawequal(v, "is_table") then
-				assert(k == "allow_add", "Predicate only used on `allow_add` action")
-
-				ctype[v] = IsTable
-			else
-				ctype[k] = v
-			end
-        end
-
-        ctype.requirement_list = adaptive.CopyArray(requires) -- put any requirements here for now, but resolve on first use
-
-        for _, name in adaptive.IterArray(interfaces) do
-			n = AddOnFirstAppearance(ctype, name, n)
-        end
-
-		FinishAdding()
-
-        Types[name] = ctype
-    else
-		assert(not Types[name], "Complex type already registered") -- previous false okay
-
-        Types[name] = false
+    for _, name in adaptive.IterArray(interfaces) do
+      n = AddOnFirstAppearance(ctype, name, n)
     end
+
+    FinishAdding()
+
+    Types[name] = ctype
+  else
+    assert(not Types[name], "Complex type already registered") -- previous false okay
+
+    Types[name] = false
+  end
 
 	return name
 end
@@ -544,27 +544,27 @@ end
 -- @param object
 -- @see LockInObject, RefInObject
 function M.RemoveAllFromObject (object)
-    local locks = Locks[object]
+  local locks = Locks[object]
 
-    if locks then
-        local list = Lists[object]
+  if locks then
+    local list = Lists[object]
 
-        for comp in adaptive.IterSet(list) do
-            if not locks[comp] then
-                AuxRemove(object, comp)
+    for comp in adaptive.IterSet(list) do
+      if not locks[comp] then
+        AuxRemove(object, comp)
 
-                list = adaptive.RemoveFromSet(list, comp)
-            end
-        end
-
-        Lists[object] = list
-    else
-        for comp in adaptive.IterSet(Lists[object]) do
-            AuxRemove(object, comp)
-        end
-
-        Lists[object] = nil
+        list = adaptive.RemoveFromSet(list, comp)
+      end
     end
+
+    Lists[object] = list
+  else
+    for comp in adaptive.IterSet(Lists[object]) do
+      AuxRemove(object, comp)
+    end
+
+    Lists[object] = nil
+  end
 end
 
 --
@@ -581,57 +581,57 @@ local ToRemove = {}
 -- @treturn boolean The remove succeeded, i.e. the component existed and was removable?
 -- @see LockInObject, RefInObject, RemoveAllFromObject
 function M.RemoveFromObject (object, ctype)
-    assert(Types[ctype] ~= nil, "Type not registered")
+  assert(Types[ctype] ~= nil, "Type not registered")
 
 	local locks = Locks[object]
 
-    if locks and locks[ctype] then
-        return false
+  if locks and locks[ctype] then
+    return false
+  end
+
+  local list = Lists[object]
+  local exists = adaptive.InSet(list, ctype)
+
+  if exists then
+    for comp in adaptive.IterSet(object) do
+      ToRemove[comp] = false
     end
 
-    local list = Lists[object]
-    local exists = adaptive.InSet(list, ctype)
+    ToRemove[ctype] = true
 
-    if exists then
-        for comp in adaptive.IterSet(object) do
-            ToRemove[comp] = false
-        end
+    repeat
+      local any = false
 
-        ToRemove[ctype] = true
+      for dtype, visited in pairs(ToRemove) do
+        local info = not visited and Types[dtype]
+        local reqs = info and info.requirements
 
-        repeat
-            local any = false
+        if reqs then
+          for k in pairs(reqs) do
+            if ToRemove[k] then -- do we depend on something that gets removed?
+              ToRemove[dtype], any = true, true -- must remove self as well
 
-            for dtype, visited in pairs(ToRemove) do
-                local info = not visited and Types[dtype]
-                local reqs = info and info.requirements
-
-                if reqs then
-                    for k in pairs(reqs) do
-                        if ToRemove[k] then -- do we depend on something that gets removed?
-                            ToRemove[dtype], any = true, true -- must remove self as well
-
-                            break
-                        end
-                    end
-                end
+              break
             end
-        until not any -- nothing else affected?
-
-        for comp, affected in pairs(ToRemove) do
-            if affected then
-                AuxRemove(object, comp)
-
-                list = adaptive.RemoveFromSet(list, comp)
-            end
-
-            ToRemove[comp] = nil
+          end
         end
+      end
+    until not any -- nothing else affected?
 
-        Lists[object] = list
+    for comp, affected in pairs(ToRemove) do
+      if affected then
+        AuxRemove(object, comp)
+
+        list = adaptive.RemoveFromSet(list, comp)
+      end
+
+      ToRemove[comp] = nil
     end
 
-    return exists
+    Lists[object] = list
+  end
+
+  return exists
 end
 
 --
@@ -645,7 +645,7 @@ end
 -- In a well-behaved implementation, this must follow a previous `RefInObject(object, ctype)` call.
 -- @see LockInObject, RemoveAllFromObject, RemoveFromObject
 function M.UnrefInObject (object, ctype)
-    local locks = Locks[object]
+  local locks = Locks[object]
 
 	if locks and NotLocked(locks, ctype) then
 		for rtype in RequiredTypes(ctype, "keep") do -- detect improper usage, e.g. unref'ing required type directly, keeping results around
@@ -654,12 +654,12 @@ function M.UnrefInObject (object, ctype)
 			end
 		end
 
-        for rtype in RequiredTypes(ctype, "reuse") do -- use validated results from previous loop, wiping them along the way
-			local new_count = locks[rtype] - 1 -- if infinity, left as-is
+    for rtype in RequiredTypes(ctype, "reuse") do -- use validated results from previous loop, wiping them along the way
+      local new_count = locks[rtype] - 1 -- if infinity, left as-is
 
-            locks[rtype] = new_count > 0 and new_count
-        end
+      locks[rtype] = new_count > 0 and new_count
     end
+  end
 
 	Locks[object] = locks
 end
