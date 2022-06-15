@@ -65,10 +65,9 @@ function M.GlobalToLocal (lcs, x, y, how)
     local cx, cy = lcs("origin")
 		local dx, dy = x - cx, y - cy
     local rx, ry, ux, uy, normalized = lcs("axes")
-		local s = Component(dx, dy, rx, ry, normalized)
-		local t = Component(dx, dy, ux, uy, normalized)
 
-		x, y = s * rx + t * ux, s * ry + t * uy
+		x = Component(dx, dy, rx, ry, normalized)
+		y = Component(dx, dy, ux, uy, normalized)
 
     if how == "use_ref" then
       local x0, y0 = lcs("ref")
