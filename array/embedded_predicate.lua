@@ -54,19 +54,19 @@ local function AuxBeginGeneration (arr, id_key, n)
 	-- master ID as slot index for convenience. This is an alternative to clearing all slots
 	-- one by one: since the master ID is new, no slots match, therefore none remain "yes".
 
-	-- A slot is marked by assigning it the current master ID. The ID is implemented as a
+	-- Slots are marked by assigning them the current master ID. The ID is implemented as a
 	-- counter (mod n), where n is the array length.
 
-	-- This would seem to produce false positives after n generations, when the counter rolls
-	-- back around to the same value. However, exactly n invalidations will have happened as
-	-- well, wiping any dangling instances.
+	-- Because of the cyclical nature, the master ID would seem to not in fact always be new;
+  -- false positives should be possible after n generations, for slots that had never been
+  -- updated in the meantime. However, exactly n invalidations will have happened as well,
+  -- so no entry will begin a generation with the new master ID.
 
-	-- That said, in stock Lua or LuaJIT, say, where numbers are doubles (or 64-bit integers
-	-- in 5.3+), much of this is a formality, given how impractically long it would take to
-	-- increment them to overflow.
+	-- That said, where numbers are doubles, 64-bit integers, etc. this is largely a formality,
+  -- given how impractically long it would take to increment them to overflow.
 	local gen_id = NextID(arr[id_key] or 0, n, arr)
 
-	arr[id_key], arr[-(gen_id + 1)] = gen_id
+	arr[id_key], arr[-gen_id] = gen_id
 end
 
 --- DOCME
@@ -222,11 +222,11 @@ function M.Wrap (arr, n)
 		elseif what == "begin_generation" then
 			gen_id = NextID(gen_id, n, arr) -- cf. AuxBeginGeneration()
 
-			arr[-(gen_id + 1)] = nil
+			arr[-gen_id] = nil
 
-		-- Get Array --
-		elseif what == "get_array" then
-			return arr
+		-- Get Info --
+		elseif what == "get_info" then
+			return arr, gen_id
 		end
 	end, arr
 end
