@@ -43,7 +43,7 @@ end
 --- DOCME
 function M.GetComponents (lcs, x, y)
 	if lcs then
-    local cx, cy = lcs("origin")
+    local cx, cy = lcs("global_origin")
 		local dx, dy = x - cx, y - cy
     local rx, ry, ux, uy, normalized = lcs("axes")
 		local s = Component(dx, dy, rx, ry, normalized)
@@ -62,18 +62,16 @@ end
 --- DOCME
 function M.GlobalToLocal (lcs, x, y, how)
 	if lcs then
-    local cx, cy = lcs("origin")
+    local cx, cy = lcs("global_origin")
 		local dx, dy = x - cx, y - cy
     local rx, ry, ux, uy, normalized = lcs("axes")
 
 		x = Component(dx, dy, rx, ry, normalized)
 		y = Component(dx, dy, ux, uy, normalized)
 
-    if how == "use_ref" then
-      local x0, y0 = lcs("ref")
+    local x0, y0 = lcs("local_origin")
 
-      x, y = x + (x0 or 0), y + (y0 or 0)
-    end
+    x, y = x + (x0 or 0), y + (y0 or 0)
 	end
 
   return x, y
@@ -86,23 +84,18 @@ end
 --- DOCME
 function M.LocalToGlobal (lcs, x, y, how)
 	if lcs then
-    local cx, cy = lcs("origin")
-    local rx, ry, ux, uy = lcs("axes") -- TODO? account for axes not normalized?
+    local x0, y0 = lcs("local_origin")
 
-    if how == "use_ref" then
-      local x0, y0 = lcs("ref")
+    x, y = x - (x0 or 0), y - (y0 or 0)
 
-      x, y = x - (x0 or 0), y - (y0 or 0)
-    end
+    local cx, cy = lcs("global_origin")
+    local rx, ry, ux, uy = lcs("axes") -- n.b. may not be normalized
 
 		x, y = cx + x * rx + y * ux, cy + x * ry + y * uy
   end
 
   return x, y
 end
-
--- TODO: these "use_ref" things suggest other functions...
--- for generality should have all four possibilities
 
 --
 --
