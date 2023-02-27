@@ -94,7 +94,7 @@ function M.PopulateLUT_Subdivide (lut, values, subdivide, nsamples, func, tolera
 		-- we have 1 / nsamples = t * (nsamples - 1) / nsamples, i.e. new parameter t = 1 /
 		-- (nsamples - 1). In general, on interation i, t = 1 / (nsamples - i + 1). (On the
 		-- final iteration, t = 1, and the right-hand side is empty.)
-		subdivide(values, Left, Right, 1 / nsamples)
+		subdivide(values, Left, Right, dt)
 
 		local ds = func(Left, tolerance)
 
